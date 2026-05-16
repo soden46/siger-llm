@@ -4,6 +4,11 @@
 
 ---
 
+![Python](https://img.shields.io/badge/Python-3.10+-blue)
+![PyTorch](https://img.shields.io/badge/PyTorch-2.x-red)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Status](https://img.shields.io/badge/status-experimental-orange)
+
 ## 🎯 Overview
 
 MambaLM adalah implementasi Large Language Model yang dibangun dari scratch menggunakan **State Space Model (SSM)** arsitektur Mamba, bukan Transformer. Keunggulan utama:
