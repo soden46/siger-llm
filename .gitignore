@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Environment
+.env
+.env.local
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
+logs/
+
+# Data
+data/raw/
+data/processed/
+data/cache/
+
+# Checkpoints and models
+checkpoints/base/
+checkpoints/lora/
+checkpoints/quantized/
+models/
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.onnx
+
+# Experiment tracking
+runs/
+wandb/
+mlruns/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
