@@ -79,7 +79,7 @@ class Trainer:
         while ada job → proses → simpan state.
         """
         dataloader = self._build_dataloader(dataset)
-        scaler     = torch.cuda.GradScaler(enabled=(self.device == "cuda"))
+        scaler = torch.amp.GradScaler("cuda", enabled=(self.device == "cuda"))
 
         global_step = 0
         best_loss   = float("inf")

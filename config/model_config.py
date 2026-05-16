@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 
 @dataclass
-class MambaConfig:
+class SigerConfig:
     vocab_size: int = 32000
     d_model: int = 512        # dimension utama
     n_layers: int = 12        # jumlah SSM block

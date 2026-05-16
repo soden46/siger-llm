@@ -2,7 +2,7 @@
 import torch
 from typing import Iterator, Optional
 from tokenizer.tokenizer import MultilingualTokenizer
-from model.mamba_model   import MambaLM
+from model.siger_model   import SigerLM
 
 
 class Generator:
@@ -16,7 +16,7 @@ class Generator:
 
     def __init__(
         self,
-        model: MambaLM,
+        model: SigerLM,
         tokenizer: MultilingualTokenizer,
         device: str = None,
     ):

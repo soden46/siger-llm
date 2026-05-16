@@ -19,7 +19,7 @@ SIGER_LLM is a custom Python LLM framework designed for experimentation, multili
 The project contains custom implementations for:
 
 - tokenizer
-- Mamba/SSM model architecture
+- Siger/SSM model architecture
 - training
 - inference
 - LoRA fine tuning
@@ -75,13 +75,13 @@ model/
 
 Handles:
 
-Mamba model
+Siger model
 SSM blocks
 sequence modeling
 
 Main files:
 
-model/mamba_model.py
+model/siger_model.py
 model/ssm_block.py
 model/ssm_core.py
 training/

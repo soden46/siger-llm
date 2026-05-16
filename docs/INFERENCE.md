@@ -2,7 +2,7 @@
 
 ## Overview
 
-Inference adalah proses menggunakan model yang sudah ditraining untuk menghasilkan teks baru. MambaLM mendukung tiga mode:
+Inference adalah proses menggunakan model yang sudah ditraining untuk menghasilkan teks baru. SIGERLM mendukung tiga mode:
 
 1. **Single generation** — satu prompt, satu output
 2. **Streaming** — output muncul token per token (seperti ChatGPT)
@@ -131,15 +131,15 @@ gen.generate(prompt,
 ## Usage — Generator
 
 ```python
-from model.mamba_model    import MambaLM
+from model.siger_model    import SIGERLM
 from tokenizer.tokenizer  import MultilingualTokenizer
 from inference.generator  import Generator
-from config.model_config  import MambaConfig
+from config.model_config  import SigerConfig
 import torch
 
 # Load model
-config = MambaConfig(vocab_size=100277, d_model=512, n_layers=12)
-model  = MambaLM(config)
+config = SigerConfig(vocab_size=100277, d_model=512, n_layers=12)
+model  = SIGERLM(config)
 model.load_state_dict(torch.load("./checkpoints/best_model.pt"))
 
 tok = MultilingualTokenizer()

@@ -1,12 +1,12 @@
 # 🤖 AGENTS.md — Panduan untuk AI Agents & LLM Tools
 
-Dokumen ini ditujukan untuk **AI agents, coding assistants, dan LLM tools** (seperti Claude, Cursor, Copilot, dsb) yang bekerja dengan codebase MambaLM.
+Dokumen ini ditujukan untuk **AI agents, coding assistants, dan LLM tools** (seperti Claude, Cursor, Copilot, dsb) yang bekerja dengan codebase SigerLM.
 
 ---
 
 ## Project Summary
 
-MambaLM adalah implementasi Large Language Model berbasis **State Space Model (Mamba)** yang dioptimasi untuk CPU-only deployment. Dibangun dengan PyTorch, menggunakan tiktoken untuk tokenisasi, ONNX Runtime untuk inference, dan FastAPI untuk serving.
+SIGER_LLM adalah implementasi Large Language Model berbasis **State Space Model (Mamba)** yang dioptimasi untuk CPU-only deployment. Dibangun dengan PyTorch, menggunakan tiktoken untuk tokenisasi, ONNX Runtime untuk inference, dan FastAPI untuk serving.
 
 **Stack utama:**
 - Language   : Python 3.11
@@ -21,12 +21,12 @@ MambaLM adalah implementasi Large Language Model berbasis **State Space Model (M
 ## Struktur Codebase
 
 ```
-mamba-llm/
-├── config/model_config.py          # MambaConfig dataclass — BACA INI DULU
+siger-llm/
+├── config/model_config.py          # SigerConfig dataclass — BACA INI DULU
 ├── model/
 │   ├── ssm_core.py                 # Core SSM math (A, B, C, D matrices)
 │   ├── ssm_block.py                # Satu SSM block lengkap
-│   └── mamba_model.py              # Full model: embed → blocks → LM head
+│   └── siger_model.py              # Full model: embed → blocks → LM head
 ├── tokenizer/tokenizer.py          # MultilingualTokenizer (tiktoken wrapper)
 ├── tokenizer/special_tokens.py     # Semua special token dan ID-nya
 ├── training/trainer.py             # Main training loop
@@ -53,7 +53,7 @@ mamba-llm/
 
 ```python
 # Kelas     : PascalCase
-class MambaLM, LoRAModel, ChatSession
+class SigerLM, LoRAModel, ChatSession
 
 # Fungsi    : snake_case
 def build_optimizer(), def encode_batch()
@@ -64,7 +64,7 @@ IGNORE_INDEX   = -100
 
 # Config    : dataclass dengan field bernama jelas
 @dataclass
-class MambaConfig:
+class SigerConfig:
     vocab_size: int = 100277
     d_model:    int = 512
 ```
@@ -189,9 +189,9 @@ value = tensor.cpu().numpy()
 ```python
 # 1. Edit config/model_config.py — tambah field baru
 # 2. Edit model/ssm_block.py — implementasi layer
-# 3. Edit model/mamba_model.py — integrasikan
+# 3. Edit model/siger_model.py — integrasikan
 # 4. Pastikan forward() signature tetap: (input_ids, targets=None) → (logits, loss)
-# 5. Test: python -c "from model.mamba_model import MambaLM; ..."
+# 5. Test: python -c "from model.siger_model import SigerLM; ..."
 ```
 
 ### Task: Tambah Special Token Baru
@@ -244,11 +244,11 @@ python -m tokenizer.tests.test_tokenizer
 # Smoke test model
 python -c "
 import torch
-from config.model_config import MambaConfig
-from model.mamba_model   import MambaLM
+from config.model_config import SigerConfig
+from model.siger_model   import SigerLM
 
-config = MambaConfig(vocab_size=1000, d_model=64, n_layers=2)
-model  = MambaLM(config)
+config = SigerConfig(vocab_size=1000, d_model=64, n_layers=2)
+model  = SigerLM(config)
 x      = torch.randint(0, 1000, (2, 32))
 logits, _ = model(x)
 assert logits.shape == (2, 32, 1000), f'Wrong shape: {logits.shape}'
@@ -269,7 +269,7 @@ Ketika membuat perubahan besar, ikuti urutan ini agar tidak ada yang break:
 1. config/model_config.py     ← tambah config baru
 2. model/ssm_core.py          ← perubahan math SSM
 3. model/ssm_block.py         ← perubahan block structure
-4. model/mamba_model.py       ← integrasi di level model
+4. model/siger_model.py       ← integrasi di level model
 5. tokenizer/special_tokens.py ← kalau ada token baru
 6. tokenizer/tokenizer.py     ← kalau ada logic tokenizer baru
 7. training/dataset.py        ← kalau ada format data baru

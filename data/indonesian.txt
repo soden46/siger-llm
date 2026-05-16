@@ -1,0 +1,19 @@
+Artificial intelligence adalah teknologi yang memungkinkan komputer belajar dari data.
+
+Indonesia adalah negara kepulauan terbesar di dunia.
+
+Machine learning digunakan dalam sistem rekomendasi, deteksi fraud, dan pemrosesan bahasa alami.
+
+Jakarta adalah ibu kota Indonesia.
+
+Pemrograman Python sering digunakan untuk data science dan machine learning.
+
+Large Language Model dapat menghasilkan teks secara otomatis berdasarkan konteks.
+
+Kecerdasan buatan berkembang sangat cepat dalam beberapa tahun terakhir.
+
+Deep learning menggunakan neural network dengan banyak layer untuk memahami pola kompleks.
+
+Transformers dan State Space Models adalah dua pendekatan berbeda dalam pemodelan sequence.
+
+Bahasa Indonesia memiliki struktur yang unik dibanding bahasa Inggris.

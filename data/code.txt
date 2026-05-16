@@ -1,0 +1,33 @@
+def hello():
+    print("Hello World")
+
+class NeuralNetwork(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+SELECT * FROM users WHERE active = 1;
+
+for i in range(10):
+    print(i)
+
+function greet(name) {
+    console.log(name)
+}
+
+<?php
+
+class UserController extends Controller
+{
+    public function index()
+    {
+        return view('users.index');
+    }
+}
+
+docker compose up -d
+
+git commit -m "initial commit"
+
+pip install torch
+
+uvicorn app:app --reload

@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────
-# requirements.txt — MambaLM: Multilingual LLM with SSM
+# requirements.txt — SIGERLM: Multilingual LLM with SSM
 # Python >= 3.10
 # ─────────────────────────────────────────────────────────────
 
@@ -52,3 +52,18 @@ dataclasses-json>=0.6.4        # config serialization
 pytest>=8.0.0
 black>=24.0.0
 isort>=5.13.0
+
+# ── PDF & Dataset Extraction ─────────────────────────────────
+pymupdf>=1.24.0                # extract text dari PDF kamus/paper
+pandas>=2.2.0                  # dataset inspection & CSV processing
+beautifulsoup4>=4.12.0         # HTML scraping
+requests>=2.32.0               # HTTP requests untuk scraping/download
+
+# ── Translation & NLP Utilities ──────────────────────────────
+sentencepiece>=0.2.0           # optional tokenizer experiments
+sacremoses>=0.1.1              # SMT preprocessing/tokenization
+langdetect>=1.0.9              # language detection
+
+# ── JSONL & Data Processing ──────────────────────────────────
+orjson>=3.10.0                 # faster JSON serialization
+jsonlines>=4.0.0               # JSONL reader/writer

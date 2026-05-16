@@ -1,4 +1,4 @@
-# 🛠️ INSTALLATION.md — Panduan Instalasi MambaLM
+# 🛠️ INSTALLATION.md — Panduan Instalasi SIGERLM
 
 ## Requirement Sistem
 
@@ -48,8 +48,8 @@ wsl --install -d Ubuntu-22.04
 
 ```bash
 # Clone repo
-git clone https://github.com/yourname/mamba-llm.git
-cd mamba-llm
+git clone https://github.com/soden46/siger-llm.git
+cd siger-llm
 
 # Install PyTorch CPU (untuk VPS tanpa GPU)
 pip install torch --index-url https://download.pytorch.org/whl/cpu
@@ -112,11 +112,11 @@ Device      : CPU
 # Quick smoke test — pastiin model bisa forward pass
 python -c "
 import torch
-from config.model_config import MambaConfig
-from model.mamba_model   import MambaLM
+from config.model_config import SigerConfig
+from model.siger_model   import SIGERLM
 
-config = MambaConfig(vocab_size=1000, d_model=128, n_layers=4)
-model  = MambaLM(config)
+config = SigerConfig(vocab_size=1000, d_model=128, n_layers=4)
+model  = SIGERLM(config)
 x      = torch.randint(0, 1000, (2, 64))
 logits, _ = model(x)
 print('✅ Model OK | output shape:', logits.shape)
@@ -149,7 +149,7 @@ print('   Decoded:', text)
 
 ```bash
 # Download dan jalanin setup script
-curl -fsSL https://raw.githubusercontent.com/yourname/mamba-llm/main/setup_vps.sh | bash
+curl -fsSL https://raw.githubusercontent.com/soden46/siger-llm/main/setup_vps.sh | bash
 ```
 
 Atau manual:
@@ -160,7 +160,7 @@ Atau manual:
 
 set -e
 
-echo "🚀 Setting up MambaLM on VPS..."
+echo "🚀 Setting up SigerLM on VPS..."
 
 # System packages
 sudo apt update
@@ -185,8 +185,8 @@ EOF
 sudo sysctl -p
 
 # Clone project
-git clone https://github.com/yourname/mamba-llm.git
-cd mamba-llm
+git clone https://github.com/soden46/siger-llm.git
+cd siger-llm
 
 # Python environment
 python3.11 -m venv venv
@@ -206,18 +206,18 @@ echo "   Start API     : python deploy.py"
 ### Setup Systemd Service (Auto-restart API)
 
 ```bash
-# /etc/systemd/system/mamba-llm.service
-sudo tee /etc/systemd/system/mamba-llm.service << EOF
+# /etc/systemd/system/siger-llm.service
+sudo tee /etc/systemd/system/siger-llm.service << EOF
 [Unit]
-Description=MambaLM API Server
+Description=SigerLM API Server
 After=network.target
 
 [Service]
 Type=simple
 User=$USER
-WorkingDirectory=/home/$USER/mamba-llm
-Environment="PATH=/home/$USER/mamba-llm/venv/bin"
-ExecStart=/home/$USER/mamba-llm/venv/bin/python deploy.py
+WorkingDirectory=/home/$USER/siger-llm
+Environment="PATH=/home/$USER/siger-llm/venv/bin"
+ExecStart=/home/$USER/siger-llm/venv/bin/python deploy.py
 Restart=always
 RestartSec=10
 
@@ -226,11 +226,11 @@ WantedBy=multi-user.target
 EOF
 
 sudo systemctl daemon-reload
-sudo systemctl enable mamba-llm
-sudo systemctl start mamba-llm
+sudo systemctl enable siger-llm
+sudo systemctl start siger-llm
 
 # Cek status
-sudo systemctl status mamba-llm
+sudo systemctl status siger-llm
 ```
 
 ---
@@ -252,7 +252,7 @@ sudo ufw status
 ## 7. Struktur Direktori Setelah Instalasi
 
 ```
-mamba-llm/
+siger-llm/
 ├── venv/                      # virtual environment (jangan di-commit)
 ├── checkpoints/               # model weights (jangan di-commit)
 │   ├── tokenizer/

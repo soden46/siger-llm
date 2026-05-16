@@ -1,4 +1,4 @@
-# 📊 EVALUATION.md — Evaluasi Model MambaLM
+# 📊 EVALUATION.md — Evaluasi Model SIGERLM
 
 ## Overview
 
@@ -55,7 +55,7 @@ GPT-2 Medium (345M)              : PPL ~26
 GPT-2 Large  (774M)              : PPL ~22
 GPT-3 (175B)                     : PPL ~20
 LLaMA-7B                         : PPL ~12
-MambaLM (66M, target lo)         : PPL < 50 ✅
+SIGERLM (66M, target)         : PPL < 50 ✅
 ```
 
 ### Cara Hitung
@@ -130,7 +130,7 @@ Score         Grade          Interpretasi
 ~25%          🔴 Random      Sama seperti asal pilih
 ```
 
-Target MambaLM (66M): > 35-40%
+Target SIGERLM (66M): > 35-40%
 
 ```python
 from evaluation.benchmarks import MultiplChoiceBenchmark
@@ -162,7 +162,7 @@ result = bench.evaluate_arc(n_samples=200)
 # 📊 ARC-Challenge: 41.5%  🟡 Moderate
 ```
 
-Target MambaLM: > 40%
+Target SIGERLM: > 40%
 
 ---
 
@@ -327,7 +327,7 @@ runner.run(n_samples=50, tag='quick_eval')
 ## 7. Target Score Realistis
 
 ```
-Metric            Random    MambaLM Target    SOTA (besar)
+Metric            Random    SIGERLM Target    SOTA (besar)
 ──────────────────────────────────────────────────────────
 Perplexity        ∞         < 50              ~8
 MMLU              25%       > 35%             89%

@@ -8,7 +8,7 @@ from .config import LoRAConfig
 
 class LoRAModel(nn.Module):
     """
-    Wrapper yang inject LoRA ke MambaLM.
+    Wrapper yang inject LoRA ke SigerLM.
 
     Cara kerja:
     1. Freeze SEMUA weight base model

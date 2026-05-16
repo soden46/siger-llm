@@ -27,5 +27,12 @@ SPECIAL_TOKENS = {
 # Reverse mapping: id → token string
 ID_TO_SPECIAL = {v: k for k, v in SPECIAL_TOKENS.items()}
 
-# Token yang TIDAK boleh di-split saat encoding
-ALLOWED_SPECIAL_IN_TEXT = {"<|endoftext|>"}
+# Token spesial yang boleh muncul di teks input dan HARUS dipertahankan
+# sebagai satu token utuh oleh tiktoken.
+#
+# Ini penting untuk:
+# - instruction tuning
+# - chat format
+# - LoRA loss masking
+# - language tag tokens
+ALLOWED_SPECIAL_IN_TEXT = set(SPECIAL_TOKENS.keys())

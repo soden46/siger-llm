@@ -1,4 +1,4 @@
-# 🏋️ TRAINING.md — Panduan Training MambaLM
+# 🏋️ TRAINING.md — Panduan Training SigerLM
 
 ## Overview Pipeline
 

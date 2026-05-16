@@ -2,7 +2,7 @@
 
 ## Overview
 
-Optimasi MambaLM difokuskan untuk deployment di **CPU-only VPS** (2 core, 4GB RAM). Ada tiga teknik utama yang dikombinasikan:
+Optimasi SIGERLM difokuskan untuk deployment di **CPU-only VPS** (2 core, 4GB RAM). Ada tiga teknik utama yang dikombinasikan:
 
 ```
 Raw PyTorch FP32
@@ -178,11 +178,11 @@ PyTorch secara default menggunakan semua core yang tersedia. Di VPS shared, ini 
 from optimization.cpu.memory import load_model_efficient
 
 # Cara biasa (double RAM saat loading):
-model = MambaLM(config)
+model = SigerLM(config)
 model.load_state_dict(torch.load("model.pt"))  # ← RAM = 2× size model
 
 # Cara efisien (single RAM):
-model = load_model_efficient(MambaLM, config, "model.pt")
+model = load_model_efficient(SigerLM, config, "model.pt")
 # Teknik:
 # 1. Init model dengan meta device (no memory allocation)
 # 2. Load state dict langsung ke CPU
@@ -296,7 +296,7 @@ configure_cpu(n_cores=2)
 
 # Step 2: Load model efisien
 from optimization.cpu.memory import load_model_efficient
-model = load_model_efficient(MambaLM, config, "./checkpoints/best_model.pt")
+model = load_model_efficient(SigerLM, config, "./checkpoints/best_model.pt")
 
 # Step 3: Quantize
 from optimization.quantization.quantize import ModelQuantizer

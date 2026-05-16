@@ -60,7 +60,7 @@ lora/model.py
 lora/run_lora.py
 lora/trainer.py
 main.py
-model/mamba_model.py
+model/siger_model.py
 model/ssm_block.py
 model/ssm_core.py
 optimization/benchmark.py
@@ -218,7 +218,7 @@ SIGER_LLM/
 │   ├── run_lora.py
 │   └── trainer.py
 ├── model/
-│   ├── mamba_model.py
+│   ├── siger_model.py
 │   ├── ssm_block.py
 │   └── ssm_core.py
 ├── optimization/
@@ -280,7 +280,7 @@ SIGER_LLM/
 from dataclasses import dataclass
 
 @dataclass
-class MambaConfig:
+class SigerConfig:
     vocab_size: int = 32000
     d_model: int = 512        # dimension utama
     n_layers: int = 12        # jumlah SSM block
@@ -956,8 +956,8 @@ class PerplexityEvaluator:
 # run_eval.py
 from optimization.cpu.threading import configure_cpu
 from optimization.cpu.memory    import load_model_efficient
-from config.model_config        import MambaConfig
-from model.mamba_model          import MambaLM
+from config.model_config        import SigerConfig
+from model.siger_model          import SigerLM
 from tokenizer.tokenizer        import MultilingualTokenizer
 from inference.generator        import Generator
 from evaluation.runner          import EvaluationRunner
@@ -967,8 +967,8 @@ def main():
     configure_cpu(n_cores=2)
 
     # Load model
-    config = MambaConfig(vocab_size=100277, d_model=512, n_layers=12)
-    model  = load_model_efficient(MambaLM, config, "./checkpoints/best_model.pt")
+    config = SigerConfig(vocab_size=100277, d_model=512, n_layers=12)
+    model  = load_model_efficient(SigerLM, config, "./checkpoints/best_model.pt")
     tok    = MultilingualTokenizer()
     gen    = Generator(model, tok)
 
@@ -1457,7 +1457,7 @@ class ChatSession:
 import torch
 from typing import Iterator, Optional
 from tokenizer.tokenizer import MultilingualTokenizer
-from model.mamba_model   import MambaLM
+from model.siger_model   import SigerLM
 
 
 class Generator:
@@ -1471,7 +1471,7 @@ class Generator:
 
     def __init__(
         self,
-        model: MambaLM,
+        model: SigerLM,
         tokenizer: MultilingualTokenizer,
         device: str = None,
     ):
@@ -2078,7 +2078,7 @@ from .config import LoRAConfig
 
 class LoRAModel(nn.Module):
     """
-    Wrapper yang inject LoRA ke MambaLM.
+    Wrapper yang inject LoRA ke SigerLM.
 
     Cara kerja:
     1. Freeze SEMUA weight base model
@@ -2221,8 +2221,8 @@ class LoRAModel(nn.Module):
 # run_lora.py
 from optimization.cpu.threading  import configure_cpu
 from optimization.cpu.memory     import load_model_efficient
-from config.model_config         import MambaConfig
-from model.mamba_model           import MambaLM
+from config.model_config         import SigerConfig
+from model.siger_model           import SigerLM
 from tokenizer.tokenizer         import MultilingualTokenizer
 from lora.config                 import LoRAConfig
 from lora.model                  import LoRAModel
@@ -2235,9 +2235,9 @@ def main():
 
     # ── 1. Load base model ────────────────────────────────
     print("📦 Loading base model...")
-    model_config = MambaConfig(vocab_size=100277, d_model=512, n_layers=12)
+    model_config = SigerConfig(vocab_size=100277, d_model=512, n_layers=12)
     base_model   = load_model_efficient(
-        MambaLM, model_config, "./checkpoints/best_model.pt"
+        SigerbaLM, model_config, "./checkpoints/best_model.pt"
     )
 
     # ── 2. Setup LoRA ─────────────────────────────────────
@@ -2406,8 +2406,8 @@ class LoRATrainer:
 ````python
 # main.py
 import torch
-from config.model_config   import MambaConfig
-from model.mamba_model     import MambaLM
+from config.model_config   import SigerConfig
+from model.siger_model     import SigerLM
 from tokenizer.tokenizer   import MultilingualTokenizer
 from training.dataset      import TextDataset
 from training.trainer      import Trainer
@@ -2457,13 +2457,13 @@ def main():
     )
 
     # 3. Model
-    model_config = MambaConfig(
+    model_config = SigerConfig(
         vocab_size=TRAIN_CONFIG["vocab_size"],
         d_model=TRAIN_CONFIG["d_model"],
         n_layers=TRAIN_CONFIG["n_layers"],
         max_seq_len=TRAIN_CONFIG["max_seq_len"],
     )
-    model = MambaLM(model_config)
+    model = SIGERLM(model_config)
 
     # 4. Trainer
     trainer = Trainer(model, TRAIN_CONFIG)
@@ -2473,12 +2473,12 @@ if __name__ == "__main__":
     main()
 ````
 
-## File: model/mamba_model.py
+## File: model/siger_model.py
 ````python
-# model/mamba_model.py
+# model/siger_model.py
 import torch.nn as nn
 
-class MambaLM(nn.Module):
+class SIGERLM(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.embedding = nn.Embedding(config.vocab_size, config.d_model)
@@ -3310,7 +3310,7 @@ SIGER_LLM/
 │   ├── run_lora.py
 │   └── trainer.py
 ├── model/
-│   ├── mamba_model.py
+│   ├── siger_model.py
 │   ├── ssm_block.py
 │   └── ssm_core.py
 ├── optimization/

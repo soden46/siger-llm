@@ -15,7 +15,7 @@ Read the full codebase, understand the architecture, improve documentation, and 
 - Always run or suggest relevant commands after editing.
 
 ## Project Structure
-- model/: Mamba/SSM model implementation
+- model/: Siger/SSM model implementation
 - tokenizer/: tokenizer implementation
 - training/: base model training
 - inference/: generator, sampler, chat, API

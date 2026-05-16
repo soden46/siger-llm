@@ -1,4 +1,8 @@
-# Python
+# ─────────────────────────────────────────────────────────────
+# .gitignore — SigerLM / SIGER_LLM
+# ─────────────────────────────────────────────────────────────
+
+# ── Python ────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *.pyo
@@ -6,47 +10,80 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+htmlcov/
 
-# Virtual environment
+# ── Virtual Environment ───────────────────────────────────────
 .venv/
 venv/
 env/
 
-# Environment
+# ── Environment Variables ─────────────────────────────────────
 .env
 .env.local
+.env.*.local
 
-# Build
+# ── Build / Packaging ─────────────────────────────────────────
 build/
 dist/
 *.egg-info/
+.eggs/
 
-# Logs
+# ── Logs ──────────────────────────────────────────────────────
 *.log
 logs/
 
-# Data
+# ── General Raw Training Data ─────────────────────────────────
+# Corpus besar untuk base pretraining tidak perlu ikut repo
 data/raw/
 data/processed/
 data/cache/
 
-# Checkpoints and models
+# ── Lampung Dataset Sources & Generated Outputs ───────────────
+# PDF sumber jangan di-push ke GitHub
+data/lampung/raw/*.pdf
+
+# Hasil ekstraksi / preview otomatis
+data/lampung/processed/
+
+# Dataset final hasil build otomatis
+data/lampung/final/train.jsonl
+data/lampung/final/valid.jsonl
+data/lampung/final/test.jsonl
+data/lampung/final/train_instruction.jsonl
+data/lampung/final/valid_instruction.jsonl
+data/lampung/final/test_instruction.jsonl
+data/lampung/final/lampung_o_trilingual_normalized.jsonl
+
+# Kalau file ini hanya file kerja sementara/generated, abaikan juga
+# Hapus tanda # jika tidak ingin dikomit:
+# data/lampung/final/lampung_o_trilingual.jsonl
+
+# ── Checkpoints and Model Artifacts ───────────────────────────
 checkpoints/base/
 checkpoints/lora/
 checkpoints/quantized/
 models/
+
 *.pt
 *.pth
 *.bin
 *.safetensors
 *.onnx
 
-# Experiment tracking
+# Tetap izinkan tokenizer config kecil kalau memang mau dikomit
+!checkpoints/tokenizer/
+!checkpoints/tokenizer/tokenizer_config.json
+
+# ── Experiment Tracking ───────────────────────────────────────
 runs/
 wandb/
 mlruns/
 
-# OS / Editor
+# ── Jupyter ───────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── OS / Editor ───────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 .vscode/

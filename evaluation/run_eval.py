@@ -1,8 +1,8 @@
 # run_eval.py
 from optimization.cpu.threading import configure_cpu
 from optimization.cpu.memory    import load_model_efficient
-from config.model_config        import MambaConfig
-from model.mamba_model          import MambaLM
+from config.model_config        import SigerConfig
+from model.siger_model          import SigerLM
 from tokenizer.tokenizer        import MultilingualTokenizer
 from inference.generator        import Generator
 from evaluation.runner          import EvaluationRunner
@@ -12,8 +12,8 @@ def main():
     configure_cpu(n_cores=2)
 
     # Load model
-    config = MambaConfig(vocab_size=100277, d_model=512, n_layers=12)
-    model  = load_model_efficient(MambaLM, config, "./checkpoints/best_model.pt")
+    config = SigerConfig(vocab_size=100277, d_model=512, n_layers=12)
+    model  = load_model_efficient(SigerLM, config, "./checkpoints/best_model.pt")
     tok    = MultilingualTokenizer()
     gen    = Generator(model, tok)
 
