@@ -355,19 +355,24 @@ Dataset hasil pipeline saat ini:
 
 ```txt
 Dataset final:
-- Total records : 1,086
+- Total records : 1,506
+
+Train/Validation/Test split:
+- Train rows    : 1,204
+- Valid rows    : 151
+- Test rows     : 151
 
 Instruction tuning:
-- Train rows    : 1,778
-- Valid rows    : 226
-- Test rows     : 228
+- Train rows    : 2,444
+- Valid rows    : 310
+- Test rows     : 318
 ```
 
 Saat masuk ke `InstructionDataset`, hasil validasi tokenisasi dan loss masking:
 
 ```txt
-Raw training examples : 1,778
-Valid examples        : 1,770
+Raw training examples : 2,444
+Valid examples        : 2,435
 ```
 
 ### Hasil LoRA Training
@@ -379,7 +384,7 @@ Max steps : 300
 Batch     : 2
 Grad accum: 4
 Eff. batch: 8
-Final loss: 1.5971
+Final loss: 1.5450
 ```
 
 Output checkpoint yang berhasil dibuat:
