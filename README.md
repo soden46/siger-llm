@@ -926,7 +926,7 @@ Bantuan sangat dibutuhkan untuk:
 - menulis dialog sehari-hari yang natural,
 - memperkaya konteks budaya dan penggunaan bahasa asli.
 
-> **Bantu saya mengembangkan translasi Bahasa Lampung Dialek O ini dengan menambahkan dataset yang lebih beragam, terutama percakapan sehari-hari, kalimat natural, dan pasangan terjemahan Lampung–Indonesia–English yang tervalidasi.**
+> **Bantu saya mengembangkan translasi Bahasa Lampung Dialek O ini dengan menambahkan dataset yang lebih beragam, terutama percakapan sehari-hari, kalimat natural, dan pasangan terjemahan Lampung–Indonesia–English yang tervalidasi, saat ini pengembangan berfokus pada dialek o.**
 
 ---
 
