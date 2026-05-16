@@ -1,0 +1,54 @@
+# ─────────────────────────────────────────────────────────────
+# requirements.txt — MambaLM: Multilingual LLM with SSM
+# Python >= 3.10
+# ─────────────────────────────────────────────────────────────
+
+# ── Core Deep Learning ────────────────────────────────────────
+torch>=2.2.0                   # CPU build: pip install torch --index-url https://download.pytorch.org/whl/cpu
+einops>=0.7.0                  # tensor ops untuk SSM
+
+# ── Tokenizer ────────────────────────────────────────────────
+tiktoken>=0.6.0                # OpenAI BPE tokenizer
+
+# ── Dataset & HuggingFace ────────────────────────────────────
+datasets>=2.18.0               # load HuggingFace datasets
+huggingface-hub>=0.21.0        # download model/dataset
+
+# ── Quantization ─────────────────────────────────────────────
+bitsandbytes>=0.43.0           # INT4/INT8 quantization (opsional, GPU only untuk INT4)
+
+# ── ONNX Export & Runtime ────────────────────────────────────
+onnx>=1.16.0                   # ONNX model format
+onnxruntime>=1.17.0            # CPU inference runtime (2-3x faster dari PyTorch CPU)
+onnxruntime-extensions>=0.9.0  # additional ops
+
+# ── API Server ────────────────────────────────────────────────
+fastapi>=0.110.0               # REST API framework
+uvicorn>=0.29.0                # ASGI server
+pydantic>=2.6.0                # request/response validation
+
+# ── Evaluation ───────────────────────────────────────────────
+nltk>=3.8.1                    # tokenization untuk BLEU
+rouge-score>=0.1.2             # ROUGE metric
+
+# ── Monitoring & Logging ─────────────────────────────────────
+psutil>=5.9.0                  # CPU/RAM monitoring
+tqdm>=4.66.0                   # progress bar
+
+# ── Utilities ────────────────────────────────────────────────
+numpy>=1.26.0
+pathlib2>=2.3.7
+dataclasses-json>=0.6.4        # config serialization
+
+# ── Optional: Experiment Tracking ────────────────────────────
+# wandb>=0.16.0                # uncomment jika mau tracking di WandB
+# tensorboard>=2.16.0          # uncomment jika mau TensorBoard
+
+# ── Optional: Faster Inference ───────────────────────────────
+# triton>=2.2.0                # custom CUDA kernels (GPU only)
+# flash-attn>=2.5.0            # flash attention (GPU only)
+
+# ── Dev Tools ────────────────────────────────────────────────
+pytest>=8.0.0
+black>=24.0.0
+isort>=5.13.0
