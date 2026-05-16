@@ -1,0 +1,68 @@
+name: Bug Report
+description: Laporkan bug atau error pada SIGER LLM
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Terima kasih sudah melaporkan bug. Mohon isi detail berikut agar masalah mudah direproduksi.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Deskripsi Bug
+      description: Jelaskan masalah yang terjadi.
+      placeholder: Contoh: Training LoRA gagal saat dataset JSONL diproses.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Langkah Reproduksi
+      description: Tulis langkah yang menyebabkan bug.
+      placeholder: |
+        1. Jalankan ...
+        2. Buka ...
+        3. Error muncul ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Hasil yang Diharapkan
+      placeholder: Jelaskan perilaku yang seharusnya terjadi.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Hasil Aktual
+      placeholder: Tempel traceback/error log di sini.
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating System
+      placeholder: Windows 11 / Ubuntu 24.04 / lainnya
+    validations:
+      required: true
+
+  - type: input
+    id: python
+    attributes:
+      label: Python Version
+      placeholder: Python 3.10
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Konteks Tambahan
+      description: Tambahkan screenshot, config, commit hash, atau info lain jika relevan.

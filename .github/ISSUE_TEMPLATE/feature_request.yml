@@ -1,0 +1,54 @@
+name: Feature Request
+description: Usulkan fitur atau peningkatan untuk SIGER LLM
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Terima kasih sudah mengusulkan fitur baru.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Masalah yang Ingin Diselesaikan
+      description: Jelaskan kebutuhan atau keterbatasan saat ini.
+      placeholder: Contoh: Belum ada evaluasi khusus untuk translator Lampung O.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Usulan Solusi
+      description: Jelaskan fitur atau pendekatan yang diinginkan.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatif yang Sudah Dipertimbangkan
+      description: Opsional, bila ada.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: area
+    attributes:
+      label: Area yang Terdampak
+      options:
+        - label: Model / arsitektur
+        - label: Training
+        - label: LoRA / fine-tuning
+        - label: Dataset
+        - label: Scraper / preprocessing
+        - label: Evaluation
+        - label: Inference / API
+        - label: Dokumentasi
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Konteks Tambahan
+      description: Tambahkan referensi, contoh, atau mockup jika ada.
