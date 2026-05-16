@@ -62,8 +62,9 @@ Pipeline dataset Lampung dibangun dari beberapa sumber:
 
 1. **Kamus Budaya Lampung–Indonesia Dialek O**
 2. **Paper SMT Lampung Nyo → Indonesia**
-3. **Format multilingual parallel corpus ala NusaX**
+3. **Rajotuho Bahasa Lampung article scraper**
 4. **Manual validated translation pairs**
+5. **Format multilingual parallel corpus ala NusaX sebagai referensi struktur**
 
 Tujuannya adalah membuat dataset translasi yang bisa dipakai untuk:
 
@@ -177,6 +178,7 @@ build_lampung_dataset.py
 | `tools/normalize_text.py` | Membersihkan dan menormalkan teks dataset |
 | `tools/build_lampung_dataset.py` | Menggabungkan dataset, deduplicate, dan membuat split |
 | `tools/build_instruction_dataset.py` | Mengubah dataset translasi menjadi instruction tuning format |
+| `tools/scrape_rajotuho.py` | Scrape artikel Bahasa Lampung dari Rajotuho menjadi pasangan Dialek O ↔ Indonesia |
 
 ---
 
@@ -252,6 +254,99 @@ LoRA:
 - LoRA params : 13,056
 - Persentase  : 0.20% dari base model
 - Adapter size: ±0.1 MB
+```
+
+## ✅ Progress Terbaru: Rajotuho Scraper & LoRA Retraining
+
+Pipeline dataset Lampung berhasil diperluas menggunakan scraper khusus untuk kategori artikel Bahasa Lampung dari **Rajotuho**.
+
+### Rajotuho Scraper
+
+Scraper baru:
+
+```txt
+tools/scrape_rajotuho.py
+```
+
+berfungsi untuk:
+
+- mengambil artikel kategori Bahasa Lampung,
+- mendeteksi konten Dialek O,
+- mengekstrak pasangan Lampung O ↔ Indonesia,
+- memfilter pola yang mengandung tag Dialek O/A,
+- menyimpan hasil ke JSONL.
+
+Output utama:
+
+```txt
+data/lampung/raw/rajotuho_pairs.jsonl
+data/lampung/processed/rajotuho_scrape_report.json
+```
+
+Scraper berhasil menambahkan ratusan pasangan baru yang lebih natural, termasuk:
+
+- kosakata tematik,
+- contoh penggunaan dalam kalimat,
+- ekspresi sehari-hari,
+- pola percakapan dan pembelajaran bahasa.
+
+### Dataset Setelah Ekspansi
+
+Setelah dataset Rajotuho dimasukkan ke pipeline dan dibersihkan:
+
+```txt
+LoRA instruction training input:
+- Raw examples  : 2,444
+- Valid examples: 2,435
+```
+
+Dataset ini lebih kaya dibanding tahap sebelumnya karena tidak lagi hanya didominasi entri kamus, tetapi mulai mencakup **contoh kalimat natural dan konteks penggunaan sehari-hari**.
+
+### LoRA Retraining Terbaru
+
+LoRA fine-tuning berhasil dijalankan ulang menggunakan dataset Lampung yang telah diperluas.
+
+```txt
+Base model:
+- vocab_size : 100271
+- d_model    : 64
+- n_layers   : 2
+
+LoRA:
+- adapter params : 13,056
+- adapter ratio  : 0.20%
+- max steps      : 300
+- effective batch: 8
+- final loss     : 1.5450
+```
+
+Output checkpoint terbaru:
+
+```txt
+checkpoints/lora/
+├── lora_step_000300.pt
+└── model_lampung_merged.pt
+```
+
+Pipeline yang telah terbukti berjalan:
+
+```txt
+Rajotuho Article Scraper
+        │
+        ▼
+rajotuho_pairs.jsonl
+        │
+        ▼
+Lampung Dataset Builder
+        │
+        ▼
+Instruction Dataset Builder
+        │
+        ▼
+LoRA Fine-Tuning
+        │
+        ▼
+Merged Lampung Checkpoint
 ```
 
 ### Dataset Lampung yang Digunakan
@@ -703,6 +798,10 @@ Target pengembangan adalah inference ringan di VPS CPU-only.
 - [x] Build Lampung instruction tuning dataset
 - [x] LoRA translasi Lampung berhasil dilatih
 - [x] Merge LoRA adapter ke base model
+- [x] Rajotuho Bahasa Lampung scraper
+- [x] Extract 400+ additional Lampung O translation candidates from web articles
+- [x] Clean noisy Rajotuho extraction cases
+- [x] Retrain Lampung LoRA using expanded instruction dataset
 - [ ] Inference demo dari `model_lampung_merged.pt`
 - [ ] Lampung O ↔ Indonesia translation evaluation
 - [ ] Lampung O ↔ English translation evaluation

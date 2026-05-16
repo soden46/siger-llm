@@ -23,6 +23,9 @@ INPUT_FILES = [
     # Hasil ekstraksi Kamus Budaya Lampung Dialek O
     PROCESSED_DIR / "kamus_pairs.jsonl",
 
+    #Hasil scarpe web ranjotuho
+    RAW_DIR / "rajotuho_pairs.jsonl",
+
     # Pasangan kalimat Nyo dari paper SMT
     RAW_DIR / "smt_pairs.jsonl",
 
