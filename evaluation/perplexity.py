@@ -1,25 +1,24 @@
 # evaluation/perplexity.py
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, Dataset
-from typing import List, Optional
+from typing import List
 import math
 
 
 class PerplexityEvaluator:
     """
     Perplexity = exp(average negative log likelihood)
-    
+
     Intuisi:
     PPL = 1     → model 100% yakin (impossible)
-    PPL = 10    → model punya 10 pilihan yang equally likely → bagus
+    PPL = 10    → model punya 10 pilihan equally likely → bagus
     PPL = 100   → model bingung → jelek
-    PPL = 1000+ → model random banget → ga belajar apa-apa
+    PPL = 1000+ → model random banget → belum belajar
 
     Referensi:
     GPT-2 small  : PPL ~29 (WikiText-103)
     GPT-3        : PPL ~20
-    Target lo    : PPL < 50 (acceptable buat model kecil)
+    Target SigerLM : PPL < 50 (acceptable untuk model kecil)
     """
 
     def __init__(self, model, tokenizer, device: str = "cpu"):
@@ -31,17 +30,18 @@ class PerplexityEvaluator:
     def compute(
         self,
         texts: List[str],
-        max_seq_len: int  = 512,
-        stride: int       = 256,   # sliding window — lebih akurat
-        batch_size: int   = 4,
+        max_seq_len: int = 512,
+        stride: int      = 256,   # sliding window overlap
+        batch_size: int  = 4,
     ) -> dict:
         """
         Hitung PPL dengan sliding window.
-        Sliding window penting buat sequence panjang:
-        daripada truncate, lo overlap tiap window
-        dan hanya hitung loss di bagian non-overlap.
+
+        Sliding window penting untuk sequence panjang:
+        daripada truncate, overlap tiap window dan hanya
+        hitung loss di bagian non-overlap.
         """
-        total_nll  = 0.0   # negative log likelihood
+        total_nll  = 0.0
         total_toks = 0
 
         for text in texts:
@@ -53,20 +53,17 @@ class PerplexityEvaluator:
 
             ids_tensor = torch.tensor(input_ids, dtype=torch.long)
 
-            # Sliding window
             prev_end = 0
             for begin in range(0, seq_len - 1, stride):
-                end        = min(begin + max_seq_len, seq_len)
-                window     = ids_tensor[begin:end].unsqueeze(0).to(self.device)
-                target_len = end - max(begin, prev_end)   # hanya hitung bagian baru
+                end    = min(begin + max_seq_len, seq_len)
+                window = ids_tensor[begin:end].unsqueeze(0).to(self.device)
 
                 logits, _ = self.model(window)
 
-                # Shift: predict token ke-i dari token ke-(i-1)
-                shift_logits = logits[0, :-1, :]   # (L-1, vocab)
-                shift_labels = window[0, 1:]        # (L-1,)
+                shift_logits = logits[0, :-1, :]
+                shift_labels = window[0, 1:]
 
-                # Hanya hitung loss di bagian baru (bukan overlap)
+                # Hanya hitung loss di bagian non-overlap
                 target_start = max(0, prev_end - begin - 1)
                 if target_start >= shift_logits.size(0):
                     continue
@@ -86,7 +83,7 @@ class PerplexityEvaluator:
             return {"ppl": float("inf"), "nll": float("inf"), "tokens": 0}
 
         avg_nll = total_nll / total_toks
-        ppl     = math.exp(avg_nll)
+        ppl     = math.exp(min(avg_nll, 100))  # clamp biar tidak overflow
 
         result = {
             "ppl":    round(ppl, 2),
@@ -95,17 +92,19 @@ class PerplexityEvaluator:
             "grade":  self._grade(ppl),
         }
 
-        print(f"📊 Perplexity: {ppl:.2f} | NLL: {avg_nll:.4f} "
-              f"| Tokens: {total_toks:,} | Grade: {result['grade']}")
+        print(
+            f"📊 Perplexity: {ppl:.2f} | NLL: {avg_nll:.4f} "
+            f"| Tokens: {total_toks:,} | Grade: {result['grade']}"
+        )
         return result
 
     @staticmethod
     def _grade(ppl: float) -> str:
-        if ppl < 15:   return "🟢 Excellent"
-        if ppl < 30:   return "🟢 Good"
-        if ppl < 50:   return "🟡 Acceptable"
-        if ppl < 100:  return "🟠 Poor"
-        return             "🔴 Very Poor"
+        if ppl < 15:  return "🟢 Excellent"
+        if ppl < 30:  return "🟢 Good"
+        if ppl < 50:  return "🟡 Acceptable"
+        if ppl < 100: return "🟠 Poor"
+        return              "🔴 Very Poor"
 
     def compare(
         self,
