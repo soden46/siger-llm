@@ -35,10 +35,7 @@ class ModelQuantizer:
         # Quantize semua layer Linear & Embedding
         quantized = quantize_dynamic(
             model_fp32,
-            qconfig_spec={
-                nn.Linear:    torch.quantization.default_dynamic_qconfig,
-                nn.Embedding: torch.quantization.default_dynamic_qconfig,
-            },
+            qconfig_spec={nn.Linear},
             dtype=torch.qint8,
         )
 

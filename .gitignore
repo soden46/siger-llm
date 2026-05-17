@@ -1,8 +1,6 @@
-# ─────────────────────────────────────────────────────────────
-# .gitignore — SigerLM / SIGER_LLM
-# ─────────────────────────────────────────────────────────────
+# SigerLM gitignore
 
-# ── Python ────────────────────────────────────────────────────
+# Python
 __pycache__/
 *.py[cod]
 *.pyo
@@ -13,53 +11,57 @@ __pycache__/
 .coverage
 htmlcov/
 
-# ── Virtual Environment ───────────────────────────────────────
+# Virtual environments
 .venv/
 venv/
 env/
 
-# ── Environment Variables ─────────────────────────────────────
+# Environment / secrets
 .env
 .env.local
 .env.*.local
 
-# ── Build / Packaging ─────────────────────────────────────────
+# Build / packaging
 build/
 dist/
 *.egg-info/
 .eggs/
 
-# ── Logs ──────────────────────────────────────────────────────
+# Logs
 *.log
 logs/
 
-# ── General Raw Training Data ─────────────────────────────────
-# Corpus besar untuk base pretraining tidak perlu ikut repo
+# Large generic pretraining data and caches
 data/raw/
 data/processed/
 data/cache/
 
-# ── Lampung Dataset Sources & Generated Outputs ───────────────
-# PDF sumber jangan di-push ke GitHub
+# Keep small curated/general seed files and generated instruction corpora.
+!data/*.txt
+!data/corpus/
+!data/corpus/*.jsonl
+
+# Lampung data policy:
+# - keep curated raw JSONL
+# - keep processed JSONL/TXT/JSON outputs needed to rebuild final data
+# - keep final JSONL instruction/corpus outputs needed to train/run
+# - do not commit raw PDF sources unless their redistribution license is explicit
 data/lampung/raw/*.pdf
+!data/lampung/raw/*.jsonl
+!data/lampung/processed/
+!data/lampung/processed/*.jsonl
+!data/lampung/processed/*.json
+!data/lampung/processed/*.txt
+!data/lampung/final/
+!data/lampung/final/*.jsonl
 
-# Hasil ekstraksi / preview otomatis
-data/lampung/processed/
+# Feedback data can be useful, but raw unreviewed user feedback may contain
+# private content. Commit only approved feedback exports.
+data/feedback/
+!data/feedback/approved_corrections.jsonl
+!data/feedback/README.md
 
-# Dataset final hasil build otomatis
-data/lampung/final/train.jsonl
-data/lampung/final/valid.jsonl
-data/lampung/final/test.jsonl
-data/lampung/final/train_instruction.jsonl
-data/lampung/final/valid_instruction.jsonl
-data/lampung/final/test_instruction.jsonl
-data/lampung/final/lampung_o_trilingual_normalized.jsonl
-
-# Kalau file ini hanya file kerja sementara/generated, abaikan juga
-# Hapus tanda # jika tidak ingin dikomit:
-# data/lampung/final/lampung_o_trilingual.jsonl
-
-# ── Checkpoints and Model Artifacts ───────────────────────────
+# Checkpoints and model artifacts
 checkpoints/base/
 checkpoints/lora/
 checkpoints/quantized/
@@ -71,19 +73,22 @@ models/
 *.safetensors
 *.onnx
 
-# Tetap izinkan tokenizer config kecil kalau memang mau dikomit
+# Keep tokenizer configs/assets if intentionally committed.
 !checkpoints/tokenizer/
 !checkpoints/tokenizer/tokenizer_config.json
+!checkpoints/tokenizer_hf_bpe/
+!checkpoints/tokenizer_hf_bpe/vocab.json
+!checkpoints/tokenizer_hf_bpe/merges.txt
 
-# ── Experiment Tracking ───────────────────────────────────────
+# Experiment tracking
 runs/
 wandb/
 mlruns/
 
-# ── Jupyter ───────────────────────────────────────────────────
+# Jupyter
 .ipynb_checkpoints/
 
-# ── OS / Editor ───────────────────────────────────────────────
+# OS / editor
 .DS_Store
 Thumbs.db
 .vscode/

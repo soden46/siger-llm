@@ -1,184 +1,154 @@
-
----
-
-## `PROJECT_CONTEXT.md`
-
-```md
 # PROJECT_CONTEXT.md
 
-# SIGER_LLM Context
+This file gives contributors and AI assistants the shortest accurate map of the current SigerLM repository.
 
-This file exists to help AI assistants and contributors understand the repository quickly.
+## Summary
 
----
+SigerLM is a custom Python LLM framework built around a State Space Model/Mamba-like architecture. The project is moving toward a general LM workflow while using Bahasa Lampung as a domain adapter and training testbed.
 
-# Project Summary
+The system currently supports:
 
-SIGER_LLM is a custom Python LLM framework designed for experimentation, multilingual language modeling, Indonesian language support, and efficient inference.
+- custom SSM language model
+- hybrid tokenizer selection
+- base training pipeline
+- config-driven LoRA fine-tuning
+- unified instruction corpus builder
+- Lampung dataset extraction and instruction generation
+- lookup-first Lampung inference
+- general/domain routing in CLI
+- evaluation and optimization scaffolding
 
-The project contains custom implementations for:
-
-- tokenizer
-- Siger/SSM model architecture
-- training
-- inference
-- LoRA fine tuning
-- evaluation
-- optimization
-
----
-
-# Main Objectives
-
-1. Build a lightweight custom LLM framework.
-2. Support multilingual workflows.
-3. Improve Indonesian language capability.
-4. Support efficient inference.
-5. Keep the codebase modular and readable.
-
----
-
-# Main Architecture
+## Architecture Snapshot
 
 ```txt
-Dataset
-   ↓
-Tokenizer
-   ↓
-Training
-   ↓
-Checkpoint
-   ↓
-Evaluation
-   ↓
-LoRA
-   ↓
-Optimization
-   ↓
-Inference/API
+data sources
+  -> domain builders or dataset registry
+  -> unified instruction corpus
+  -> tokenizer
+  -> base model / LoRA training
+  -> merged checkpoint
+  -> inference router
+  -> general chat or Lampung tools
+```
 
-Important Modules
-tokenizer/
+## Core Principle
 
-Handles:
+The model architecture is general. Lampung is implemented as a domain layer:
 
-encoding
-decoding
-vocab management
-multilingual token handling
+- data: `data/lampung/`, `tools/build_lampung_dataset.py`
+- instruction tasks: `tools/build_instruction_dataset.py`
+- lookup/rules: `retrieval/`
+- runtime pipeline: `inference/lampung_pipeline.py`
+- auto-routing: `inference/router.py`
 
-Main files:
+Do not put domain-specific Lampung behavior into `model/`.
 
-tokenizer/tokenizer.py
-tokenizer/trainer.py
-model/
+## Important Modules
 
-Handles:
-
-Siger model
-SSM blocks
-sequence modeling
-
-Main files:
-
+```txt
+config/model_config.py
 model/siger_model.py
 model/ssm_block.py
 model/ssm_core.py
-training/
-
-Handles:
-
-training loop
-optimizer
-checkpointing
-logging
-
-Main files:
-
-training/trainer.py
-training/optimizer.py
-training/checkpoint.py
-inference/
-
-Handles:
-
-generation
-streaming
-chat sessions
-API inference
-
-Main files:
-
+tokenizer/hybrid_tokenizer.py
+training/dataset.py
+training/dataset_registry.py
+tools/build_instruction_corpus.py
+lora/config.py
+lora/dataset.py
+lora/run_lora.py
 inference/generator.py
 inference/chat.py
-inference/api.py
-lora/
+inference/router.py
+inference/lampung_pipeline.py
+retrieval/instruction_lookup.py
+retrieval/compositional_translator.py
+```
 
-Handles:
+## Config Files
 
-LoRA injection
-adapter training
-adapter merging
+```txt
+configs/datasets/lampung_instruction.json
+configs/datasets/general_instruction.json
+configs/training/lampung_lora.json
+configs/training/general_lora.json
+```
 
-Main files:
+## Current Dataset State
 
-lora/layer.py
-lora/model.py
-lora/trainer.py
-evaluation/
+Latest verified build:
 
-Handles:
+```txt
+data/lampung/processed/percakapan_1000_pairs.jsonl: 3100 rows
+data/lampung/processed/compositional_pairs.jsonl: 1968 rows
+data/lampung/final/train.jsonl: 4325 rows
+data/lampung/final/valid.jsonl: 541 rows
+data/lampung/final/test.jsonl: 541 rows
+data/lampung/final/train_augmented_instruction.jsonl: 32059 rows
+data/corpus/lampung_instruction_train.jsonl: 30701 rows
+data/corpus/general_instruction_train.jsonl: 30704 rows
+```
 
-perplexity
-MMLU
-ARC
-BLEU
-ROUGE
-Indo benchmarks
-optimization/
+`general_instruction_train.jsonl` is currently still dominated by Lampung because local general text files are small. To make SigerLM more general, add larger instruction/chat/text sources to `configs/datasets/general_instruction.json`.
 
-Handles:
+## Main Commands
 
-kv cache
-quantization
-ONNX export
-benchmarking
-Main Dependencies
+Build Lampung data:
 
-Expected dependencies:
+```powershell
+python tools\extract_percakapan_pdf.py
+python tools\build_compositional_lampung_dataset.py
+python tools\build_lampung_dataset.py
+python tools\build_instruction_dataset.py
+```
 
-torch
-numpy
-fastapi
-uvicorn
-pydantic
-datasets
-tqdm
-onnx
-onnxruntime
-Important Notes
-This project is experimental.
-The architecture may evolve frequently.
-Some modules may still be incomplete.
-Prefer incremental improvements.
-Do not rewrite the architecture drastically.
-Current Priorities
-stabilize setup
-improve docs
-improve training stability
-improve inference speed
-improve evaluation coverage
-improve optimization tools
-AI Assistant Instructions
+Build unified corpora:
 
-When working on this repository:
+```powershell
+python tools\build_instruction_corpus.py --registry configs\datasets\lampung_instruction.json
+python tools\build_instruction_corpus.py --registry configs\datasets\general_instruction.json
+```
 
-inspect related files before editing
-avoid hallucinating missing features
-keep changes modular
-explain changes clearly
-update docs when necessary
+Train LoRA:
 
-If something is unclear:
+```powershell
+python lora\run_lora.py --config configs\training\lampung_lora.json
+python lora\run_lora.py --config configs\training\general_lora.json
+```
 
-Need confirmation from project owner.
+Run CLI:
+
+```powershell
+python chat_cli.py
+```
+
+CLI modes:
+
+```txt
+0 auto/general router
+1 Lampung O -> Indonesia
+2 Indonesia -> Lampung O
+3 Lampung O -> English
+4 Lampung reasoning
+5 general chat
+6 Lampung word order
+```
+
+## Latest Smoke Result
+
+```txt
+Mode: 0
+Input: Nyak haga mengan manuk di warung paghek jalan
+Assistant: aku mau makan ayam di warung dekat jalan
+Route: lampung_to_id
+Source: exact instruction lookup
+```
+
+## Current Priorities
+
+1. Expand general instruction/chat corpora.
+2. Keep Lampung domain as an adapter, not the whole architecture.
+3. Train/evaluate `general_lora.json` once general corpus is meaningful.
+4. Add small automated tests for corpus builder, router, and lookup.
+5. Improve evaluation coverage for Lampung ID/EN and general chat.
+6. Keep CPU/VPS memory use under control.

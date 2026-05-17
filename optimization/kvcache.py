@@ -1,5 +1,7 @@
 # optimization/kvcache.py
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 from dataclasses import dataclass, field
 from typing import Optional
 

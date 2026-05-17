@@ -16,7 +16,7 @@ class SigerConfig:
     """
 
     # ── Vocabulary ────────────────────────────────────────
-    vocab_size: int  = 100277       # tiktoken cl100k_base
+    vocab_size: int = 100271       # tiktoken cl100k_base
                                     # smoke test pakai 100271
 
     # ── Model Dimensions ──────────────────────────────────

@@ -3,7 +3,7 @@ import torch
 from pathlib import Path
 from config.model_config   import SigerConfig
 from model.siger_model     import SigerLM
-from tokenizer.tokenizer   import MultilingualTokenizer
+from tokenizer.hybrid_tokenizer import build_tokenizer
 from training.dataset      import TextDataset
 from training.trainer      import Trainer
 from model.ssm_core import SSMCore
@@ -28,7 +28,7 @@ TRAIN_CONFIG = {
     # "grad_accum_steps": 4,      # effective batch = 8 * 4 = 32
 
     # Training kecil
-    "max_steps": 20,
+    "max_steps": 3000,
     "batch_size": 2,
     "max_seq_len": 32,
     "grad_accum_steps": 1,
@@ -62,7 +62,8 @@ TRAIN_CONFIG = {
 
 def main():
     # 1. Tokenizer
-    tok = MultilingualTokenizer()
+    tok = build_tokenizer("auto")
+    print(f"Tokenizer backend: {tok.backend} | vocab_size={tok.vocab_size}")
 
     # 2. Dataset — ganti dengan corpus lo
     sample_texts = []
@@ -90,7 +91,7 @@ def main():
 
     # 3. Model
     model_config = SigerConfig(
-        vocab_size=TRAIN_CONFIG["vocab_size"],
+        vocab_size=tok.vocab_size,
         d_model=TRAIN_CONFIG["d_model"],
         n_layers=TRAIN_CONFIG["n_layers"],
         max_seq_len=TRAIN_CONFIG["max_seq_len"],
@@ -100,7 +101,7 @@ def main():
 
     # 4. Trainer
     trainer = Trainer(model, TRAIN_CONFIG)
-    trainer.train(dataset, resume=True)
+    trainer.train(dataset, resume=False)
 
 if __name__ == "__main__":
     main()

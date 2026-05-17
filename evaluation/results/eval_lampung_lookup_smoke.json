@@ -1,0 +1,173 @@
+{
+  "dataset_path": "data/lampung/final/valid_augmented_instruction.jsonl",
+  "n_cases": 20,
+  "exact_match": 0.0,
+  "source_counts": {
+    "model generation": 20
+  },
+  "source_exact_match": {
+    "model generation": 0.0
+  },
+  "rows": [
+    {
+      "instruction": "Susun kata Lampung O berikut menjadi kalimat yang benar",
+      "input": "nengei bagho ruwet tebabeng Nyak ino",
+      "expected": "Nyak ruwet nengei bagho tebabeng ino",
+      "output": "InF:unggakIn paghek learningata mengambiloualItewwbuh.\n\n\nIInF:\nTeks Bahasa Indonesia \"F. Pertahan dalam. Pertahanion.\n\n\nINanyakcabat GunungIn. \nINTeks sepi",
+      "source": "model generation",
+      "exact_match": false
+    },
+    {
+      "instruction": "Terjemahkan Bahasa Indonesia ke Lampung O",
+      "input": "kue dodol yang diletakkan di nampan dan dihiasi koin di pinggirnya yang digunakan untuk upacara adat.",
+      "expected": "bebedeng",
+      "output": "atap STiunghineanananacKura no learning kesasar.F Bu J. Pertahan dalam. Pertahanion.\n\n\nINanyakcabat GunungIn. \nINTeks sepi GunungI itu upastis4ampung4 pemandaion theunggang:",
+      "source": "model generation",
+      "exact_match": false
+    },
+    {
+      "instruction": "Terjemahkan Bahasa Indonesia ke Lampung O dan jelaskan kata per kata",
+      "input": "dia mau kesana",
+      "expected": "Iyo agow dak nei",
+      "output": "Teks Bahasa Indonesia \"F. Pertahan dalam. Pertahanion.\n\n\nINanyakcabat GunungIn. \nINTeks sepi GunungI itu upastis4ampung4 pemandaion theunggang: bersanatal bet girl \".14kata dient d\n\n P gisai Lonoentencecc di.\n\n\nINanyakc",
+      "source": "model generation",
+      "exact_match": false
+    },
+    {
+      "instruction": "Translate Lampung O to English and explain word by word",
+      "input": "Dawah ijo gham ago belajar Matematika jamo Bahaso Lappung",
+      "expected": "Today we are going to learn Mathematics and the Lampung language.",
+      "output": "Teks Bahasa Indonesia \"F. Pertahan dalam. Pertahanion.\n\n\nINanyakcabat GunungIn. \nINTeks sepi GunungI itu upastis4ampung4 pemandaion theunggang: bersanatal bet girl \".14kata dient d\n\n P gisai Lonoentencecc di.\n\n\nINanyakc",
+      "source": "model generation",
+      "exact_match": false
+    },
+    {
+      "instruction": "Terjemahkan Bahasa Indonesia ke Lampung O",
+      "input": "jelas.",
+      "expected": "tetagh",
+      "output": "rearingsent sehat dis learningorenglus tagen tagen.",
+      "source": "model generation",
+      "exact_match": false
+    },
+    {
+      "instruction": "Translate English to Lampung O and explain word by word",
+      "input": "a porch railing designed to function as a seating bench.",
+      "expected": "andang-andang",
+      "output": "Teks Bahasa Indonesia \"F. Pertahan dalam. Pertahanion.\n\n\nINanyakcabat GunungIn. \nINTeks sepi GunungI itu upastis4ampung4 pemandaion theunggang: bersanatal bet girl \".14kata dient d\n\n P gisai Lonoentencecc di.\n\n\nINanyakc",
+      "source": "model generation",
+      "exact_match": false
+    },
+    {
+      "instruction": "Terjemahkan Bahasa Indonesia ke Lampung O",
+      "input": "dodol berbahan dasar labu, biasanya sbg hidangan acara adat.",
+      "expected": "dodol labu",
+      "output": "atap m \". Pertahan blumbana di siritseargawiketereml didukung with Pertahanion.\n\n\nINanyakcabat GunungIn. \nINTeks sepi GunungI itu upastis4ampung4 pemandaion theunggang: bersanatal bet girl \"",
+      "source": "model generation",
+      "exact_match": false
+    },
+    {
+      "instruction": "Translate Lampung O to English and explain word by word",
+      "input": "umbut kelapo",
+      "expected": "coconut heart / palm cabbage.",
+      "output": "Teks Bahasa Indonesia \"F. Pertahan dalam. Pertahanion.\n\n\nINanyakcabat GunungIn. \nINTeks sepi GunungI itu upastis4ampung4 pemandaion theunggang: bersanatal bet girl \".14kata dient d\n\n P gisai Lonoentencecc di.\n\n\nINanyakc",
+      "source": "model generation",
+      "exact_match": false
+    },
+    {
+      "instruction": "Terjemahkan Bahasa Indonesia ke Lampung O dan jelaskan kata per kata",
+      "input": "buah yg berguguran dalam jumlah banyak.",
+      "expected": "belubur",
+      "output": "Teks Bahasa Indonesia \"F. Pertahan dalam. Pertahanion.\n\n\nINanyakcabat GunungIn. \nINTeks sepi GunungI itu upastis4ampung4 pemandaion theunggang: bersanatal bet girl \".14kata dient d\n\n P gisai Lonoentencecc di.\n\n\nINanyakc",
+      "source": "model generation",
+      "exact_match": false
+    },
+    {
+      "instruction": "Translate English to Lampung O and explain word by word",
+      "input": "the partition line or segment border on fruits.",
+      "expected": "luhikh",
+      "output": "Teks Bahasa Indonesia \"F. Pertahan dalam. Pertahanion.\n\n\nINanyakcabat GunungIn. \nINTeks sepi GunungI itu upastis4ampung4 pemandaion theunggang: bersanatal bet girl \".14kata dient d\n\n P gisai Lonoentencecc di.\n\n\nINanyakc",
+      "source": "model generation",
+      "exact_match": false
+    },
+    {
+      "instruction": "Translate English to Lampung O and explain word by word",
+      "input": "notifying the punyimbang (customary elders) and the community that a begawi festival will be held by giving money to the senior punyimbang as a symbol.",
+      "expected": "turun pemandai",
+      "output": "Teks Bahasa Indonesia \"F. Pertahan dalam. Pertahanion.\n\n\nINanyakcabat GunungIn. \nINTeks sepi GunungI itu upastis4ampung4 pemandaion theunggang: bersanatal bet girl \".14kata dient d\n\n P gisai Lonoentencecc di.\n\n\nINanyakc",
+      "source": "model generation",
+      "exact_match": false
+    },
+    {
+      "instruction": "Translate Lampung O to English and explain word by word",
+      "input": "dadi",
+      "expected": "a form of poetic singing in lampung containing metaphors, deep meanings, and subtle satire, sung during new year, harvest, or courtship gatherings.",
+      "output": "Teks Bahasa Indonesia \"F. Pertahan dalam. Pertahanion.\n\n\nINanyakcabat GunungIn. \nINTeks sepi GunungI itu upastis4ampung4 pemandaion theunggang: bersanatal bet girl \".14kata dient d\n\n P gisai Lonoentencecc di.\n\n\nINanyakc",
+      "source": "model generation",
+      "exact_match": false
+    },
+    {
+      "instruction": "Translate English to Lampung O",
+      "input": "a lampung pepadun customary shawl, usually white, red, yellow, or with batik patterns.",
+      "expected": "selappai",
+      "output": "atap S:Ap:talam pokoknya disurukrit \" \"udjiji pasiw calSidat putih, N. Pertahanion.\n\n\nINanyakcabat GunungIn. \nINTeks sepi GunungI itu upastis4ampung4 pemandaion theunggang: bersan",
+      "source": "model generation",
+      "exact_match": false
+    },
+    {
+      "instruction": "Terjemahkan Bahasa Indonesia ke Lampung Nyo",
+      "input": "dia tidur saja",
+      "expected": "yo pedem gaweh",
+      "output": "atap S:Ap:talam pokoknya disurukrit \" \"udjiji pasiw calSidat putih, N. Pertahanion.\n\n\nINanyakcabat GunungIn. \nINTeks sepi GunungI itu upastis4ampung4 pemandaion theunggang: bersan",
+      "source": "model generation",
+      "exact_match": false
+    },
+    {
+      "instruction": "Translate English to Lampung O and explain word by word",
+      "input": "a married man.",
+      "expected": "pengawou",
+      "output": "Teks Bahasa Indonesia \"F. Pertahan dalam. Pertahanion.\n\n\nINanyakcabat GunungIn. \nINTeks sepi GunungI itu upastis4ampung4 pemandaion theunggang: bersanatal bet girl \".14kata dient d\n\n P gisai Lonoentencecc di.\n\n\nINanyakc",
+      "source": "model generation",
+      "exact_match": false
+    },
+    {
+      "instruction": "Susun kata Bahasa Indonesia berikut menjadi kalimat yang benar",
+      "input": "puyuh? Kamu memelihara",
+      "expected": "Kamu memelihara puyuh?",
+      "output": "atap STiunghineanananacKura no learning kesasar.F Bu J. Pertahan dalam. Pertahanion.\n\n\nINanyakcabat GunungIn. \nINTeks sepi GunungI itu upastis4ampung4 pemandaion theunggang:",
+      "source": "model generation",
+      "exact_match": false
+    },
+    {
+      "instruction": "Terjemahkan Lampung O ke Bahasa Indonesia dan jelaskan kata per kata",
+      "input": "andang-andang",
+      "expected": "pagar di teras rumah yg difungsikan sbg tempat duduk.",
+      "output": "Teks Bahasa Indonesia \"F. Pertahan dalam. Pertahanion.\n\n\nINanyakcabat GunungIn. \nINTeks sepi GunungI itu upastis4ampung4 pemandaion theunggang: bersanatal bet girl \".14kata dient d\n\n P gisai Lonoentencecc di.\n\n\nINanyakc",
+      "source": "model generation",
+      "exact_match": false
+    },
+    {
+      "instruction": "Terjemahkan Bahasa Indonesia ke Lampung O",
+      "input": "Ia tabrakan motor kemarin, dadanya sakit, jadi masih menunggu hasil rontgent dahulu",
+      "expected": "Yo tumburan mutur berbei, dadone sakik, jadi lagi nunggeu hasil rontgent pay",
+      "output": "ent d\n\n P gisai Lonoentencecc di.\n\n\nINanyakcabat GunungIn. \nINTeks sepi GunungI itu upastis4ampung4 pemandaion theunggang: bersanatal bet girl \".14kata dient d\n\n P gisai",
+      "source": "model generation",
+      "exact_match": false
+    },
+    {
+      "instruction": "Translate English to Lampung O and explain word by word",
+      "input": "coconut heart / palm cabbage.",
+      "expected": "umbut kelapo",
+      "output": "Teks Bahasa Indonesia \"F. Pertahan dalam. Pertahanion.\n\n\nINanyakcabat GunungIn. \nINTeks sepi GunungI itu upastis4ampung4 pemandaion theunggang: bersanatal bet girl \".14kata dient d\n\n P gisai Lonoentencecc di.\n\n\nINanyakc",
+      "source": "model generation",
+      "exact_match": false
+    },
+    {
+      "instruction": "Terjemahkan Bahasa Indonesia ke Lampung O dan jelaskan kata per kata",
+      "input": "perhatian.",
+      "expected": "pesinei",
+      "output": "Teks Bahasa Indonesia \"F. Pertahan dalam. Pertahanion.\n\n\nINanyakcabat GunungIn. \nINTeks sepi GunungI itu upastis4ampung4 pemandaion theunggang: bersanatal bet girl \".14kata dient d\n\n P gisai Lonoentencecc di.\n\n\nINanyakc",
+      "source": "model generation",
+      "exact_match": false
+    }
+  ]
+}

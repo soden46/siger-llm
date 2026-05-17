@@ -35,6 +35,13 @@ class ChatRequest(BaseModel):
     temperature: float = 0.8
     max_new_tokens: int = 300
 
+class MemoryDocumentRequest(BaseModel):
+    text: str
+    metadata: dict = Field(default_factory=dict)
+
+class MemoryFactRequest(BaseModel):
+    fact: str
+
 class GenerateResponse(BaseModel):
     text:        str
     token_count: int
@@ -95,7 +102,7 @@ async def chat(req: ChatRequest):
     session  = _sessions[req.session_id]
     response = session.chat(
         req.message,
-        stream=False,
+        stream=req.stream,
         temperature=req.temperature,
         max_new_tokens=req.max_new_tokens,
     )
@@ -107,6 +114,37 @@ def reset_chat(session_id: str):
     if session_id in _sessions:
         _sessions[session_id].reset()
     return {"status": "reset"}
+
+
+@app.post("/chat/{session_id}/memory/document")
+def add_memory_document(session_id: str, req: MemoryDocumentRequest):
+    if _generator is None:
+        raise HTTPException(503, "Model not loaded")
+
+    if session_id not in _sessions:
+        _sessions[session_id] = ChatSession(_generator)
+
+    _sessions[session_id].add_document(req.text, metadata=req.metadata)
+    return {"status": "ok", "memory": _sessions[session_id].memory_stats()}
+
+
+@app.post("/chat/{session_id}/memory/fact")
+def add_memory_fact(session_id: str, req: MemoryFactRequest):
+    if _generator is None:
+        raise HTTPException(503, "Model not loaded")
+
+    if session_id not in _sessions:
+        _sessions[session_id] = ChatSession(_generator)
+
+    _sessions[session_id].add_pinned_fact(req.fact)
+    return {"status": "ok", "memory": _sessions[session_id].memory_stats()}
+
+
+@app.get("/chat/{session_id}/memory")
+def get_memory_stats(session_id: str):
+    if session_id not in _sessions:
+        raise HTTPException(404, "Session not found")
+    return _sessions[session_id].memory_stats()
 
 
 # ── Startup ────────────────────────────────────────────────

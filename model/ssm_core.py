@@ -31,6 +31,33 @@ class SSMCore(nn.Module):
         self.x_proj = nn.Linear(d_inner, dt_rank + config.d_state * 2, bias=False)
         self.dt_proj = nn.Linear(dt_rank, d_inner, bias=True)
 
+    def step(self, x_t: torch.Tensor, h: torch.Tensor | None = None):
+        # x_t: (B, 1, d_inner)
+        B, _, D = x_t.shape
+        d_state = self.d_state
+
+        if h is None:
+            h = torch.zeros(B, D, d_state, device=x_t.device, dtype=x_t.dtype)
+
+        A = -torch.exp(self.A_log.float()).to(x_t.dtype)
+
+        x_proj = self.x_proj(x_t)
+        dt_rank = self.dt_proj.in_features
+        delta, B_mat, C_mat = x_proj.split([dt_rank, d_state, d_state], dim=-1)
+
+        delta = F.softplus(self.dt_proj(delta))
+
+        dA = torch.exp(delta.squeeze(1).unsqueeze(-1) * A)
+        dB = delta.squeeze(1).unsqueeze(-1) * B_mat.squeeze(1).unsqueeze(-2)
+
+        x_now = x_t.squeeze(1).unsqueeze(-1)
+        h = dA * h + dB * x_now
+
+        y = (h * C_mat.squeeze(1).unsqueeze(-2)).sum(-1)
+        y = y + x_t.squeeze(1) * self.D
+
+        return y.unsqueeze(1), h
+
     def forward(self, x):
         # x shape: (batch, seq_len, d_inner)
         B, L, D = x.shape
@@ -59,6 +86,9 @@ class SSMCore(nn.Module):
             h = dA[:, t] * h + dB[:, t] * x[:, t].unsqueeze(-1)
             y = (h * C_mat[:, t].unsqueeze(-2)).sum(-1)  # (B, D)
             ys.append(y)
+
+        if not torch.onnx.is_in_onnx_export():
+            self._last_h = h.detach()
 
         y = torch.stack(ys, dim=1)  # (B, L, D)
         y = y + x * self.D          # skip connection

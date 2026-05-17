@@ -1,5 +1,6 @@
-# lora/config.py
 from dataclasses import dataclass, field
+import json
+from pathlib import Path
 from typing import List, Optional
 
 
@@ -26,6 +27,8 @@ class LoRAConfig:
     warmup_steps: int = 20
     max_seq_len: int = 128
     weight_decay: float = 0.01
+    device: str = "auto"  # "auto", "cpu", or "cuda"
+    prefer_gpu: bool = True
 
     # ── Dataset Lokal Lampung ─────────────────────────────
     dataset_path: str = "data/lampung/final/train_instruction.jsonl"
@@ -42,7 +45,21 @@ class LoRAConfig:
     save_dir: str = "./checkpoints/lora"
     save_every: int = 100
     log_interval: int = 10
+    merged_output: str = "./checkpoints/lora/model_merged.pt"
 
     @property
     def scaling(self) -> float:
         return self.alpha / self.rank
+
+    @classmethod
+    def from_json(cls, path: str | Path) -> "LoRAConfig":
+        config_path = Path(path)
+        with config_path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        valid_fields = set(cls.__dataclass_fields__.keys())
+        unknown = sorted(set(data.keys()) - valid_fields)
+        if unknown:
+            raise ValueError(f"Unknown LoRAConfig fields in {config_path}: {unknown}")
+
+        return cls(**data)

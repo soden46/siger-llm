@@ -1,5 +1,6 @@
 # training/logger.py
 import time
+import math
 from collections import deque
 
 
@@ -25,7 +26,7 @@ class TrainingLogger:
             avg_loss   = sum(self.loss_window) / len(self.loss_window)
             avg_step_t = sum(self.step_times) / len(self.step_times)
             elapsed    = now - self.start_time
-            perplexity = min(2 ** avg_loss, 99999)  # PPL = 2^loss
+            perplexity = min(math.exp(avg_loss), 99999)
 
             print(
                 f"step={step:>7,} | "

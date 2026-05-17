@@ -1,6 +1,7 @@
 # lora/trainer.py
 import torch
 import torch.nn as nn
+import time
 from torch.utils.data import DataLoader
 from functools import partial
 from pathlib import Path
@@ -10,6 +11,7 @@ from .model   import LoRAModel
 from .dataset import InstructionDataset, collate_fn
 from training.optimizer import CosineScheduler
 from training.logger    import TrainingLogger
+from optimization.hardware import detect_hardware, print_hardware_profile
 
 
 class LoRATrainer:
@@ -22,7 +24,12 @@ class LoRATrainer:
         self.model     = lora_model
         self.config    = config
         self.tokenizer = tokenizer
-        self.device    = "cpu"   # VPS lo CPU only
+        if config.device == "auto":
+            hardware = detect_hardware(prefer_gpu=config.prefer_gpu)
+            print_hardware_profile(hardware)
+            self.device = hardware.device
+        else:
+            self.device = config.device
         self.model.to(self.device)
 
         # Hanya optimize LoRA params
@@ -53,7 +60,7 @@ class LoRATrainer:
             shuffle=True,
             collate_fn=partial(collate_fn, pad_id=self.tokenizer.pad_id),
             num_workers=1,
-            pin_memory=False,
+            pin_memory=(self.device == "cuda"),
         )
 
         print(f"\n🚀 LoRA Training")
@@ -64,6 +71,8 @@ class LoRATrainer:
 
         self.model.train()
         step = 0
+        tokens_since_step = 0
+        last_step_time = time.time()
         self.optimizer.zero_grad()
 
         while step < self.config.max_steps:
@@ -73,16 +82,23 @@ class LoRATrainer:
 
                 input_ids = batch["input_ids"].to(self.device)
                 labels    = batch["labels"].to(self.device)
+                attention_mask = batch.get("attention_mask")
+                if attention_mask is not None:
+                    tokens_since_step += int(attention_mask.sum().item())
+                else:
+                    tokens_since_step += int((input_ids != self.tokenizer.pad_id).sum().item())
 
                 # Forward
                 logits, _ = self.model(input_ids)
 
-                # Loss — hanya di posisi yang bukan -100
+                shift_logits = logits[:, :-1, :].contiguous()
+                shift_labels = labels[:, 1:].contiguous()
+
                 loss = nn.functional.cross_entropy(
-                    logits.view(-1, logits.size(-1)),
-                    labels.view(-1),
-                    ignore_index=-100,    # skip system/user tokens
-                    label_smoothing=0.1,  # regularization ringan
+                    shift_logits.view(-1, shift_logits.size(-1)),
+                    shift_labels.view(-1),
+                    ignore_index=-100,
+                    label_smoothing=0.0,
                 )
                 loss = loss / self.config.grad_accum
                 loss.backward()
@@ -95,7 +111,18 @@ class LoRATrainer:
                     self.optimizer.zero_grad()
                     lr = self.scheduler.step()
 
-                    self.logger.log(step, loss.item() * self.config.grad_accum, lr)
+                    now = time.time()
+                    elapsed = max(now - last_step_time, 1e-9)
+                    tokens_per_sec = tokens_since_step / elapsed
+                    last_step_time = now
+                    tokens_since_step = 0
+
+                    self.logger.log(
+                        step,
+                        loss.item() * self.config.grad_accum,
+                        lr,
+                        tokens_per_sec=tokens_per_sec,
+                    )
 
                     if step > 0 and step % self.config.save_every == 0:
                         self._save(step, loss.item())

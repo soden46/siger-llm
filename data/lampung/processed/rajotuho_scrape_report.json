@@ -1,0 +1,162 @@
+{
+  "category_url": "https://rajotuho.com/category/bahasa-lampung/",
+  "articles_found": 17,
+  "raw_pairs_found": 428,
+  "deduplicated_pairs_saved": 420,
+  "output_jsonl": "data\\lampung\\raw\\rajotuho_pairs.jsonl",
+  "articles": [
+    {
+      "url": "https://rajotuho.com/nama-serangga-dalam-bahasa-lampung/",
+      "title": "Nama Serangga Dalam Bahasa Lampung",
+      "status": "ok",
+      "topic": "language_learning",
+      "dialect_o_marker": true,
+      "blocks": 78,
+      "pairs": 62
+    },
+    {
+      "url": "https://rajotuho.com/percakapan-bahasa-lampung-dialek-o-nyow/",
+      "title": "Percakapan Bahasa Lampung Dialek O (Nyow)",
+      "status": "ok",
+      "topic": "conversation",
+      "dialect_o_marker": true,
+      "blocks": 45,
+      "pairs": 27
+    },
+    {
+      "url": "https://rajotuho.com/percakapan-bahasa-lampung-dialek-a/",
+      "title": "Percakapan Bahasa Lampung Dialek A (Api)",
+      "status": "ok",
+      "topic": "conversation",
+      "dialect_o_marker": true,
+      "blocks": 54,
+      "pairs": 19
+    },
+    {
+      "url": "https://rajotuho.com/apa-kabar-dalam-bahasa-lampung/",
+      "title": "Apa Kabar Dalam Bahasa Lampung",
+      "status": "ok",
+      "topic": "greeting",
+      "dialect_o_marker": false,
+      "blocks": 1,
+      "pairs": 0
+    },
+    {
+      "url": "https://rajotuho.com/percakapan-perkenalan-bahasa-lampung/",
+      "title": "Percakapan Perkenalan Bahasa Lampung",
+      "status": "ok",
+      "topic": "introduction",
+      "dialect_o_marker": true,
+      "blocks": 37,
+      "pairs": 10
+    },
+    {
+      "url": "https://rajotuho.com/percakapan-bahasa-lampung-tentang-sakit-sakik-maghing-bahaban/",
+      "title": "Percakapan Bahasa Lampung Tentang Sakit (Sakik, Maghing, Bahaban)",
+      "status": "ok",
+      "topic": "health",
+      "dialect_o_marker": true,
+      "blocks": 45,
+      "pairs": 22
+    },
+    {
+      "url": "https://rajotuho.com/nama-ikan-dan-hewan-air-lainnya-dalam-bahasa-lampung/",
+      "title": "Nama Ikan dan Hewan Air Lainnya Dalam Bahasa Lampung",
+      "status": "ok",
+      "topic": "language_learning",
+      "dialect_o_marker": true,
+      "blocks": 87,
+      "pairs": 55
+    },
+    {
+      "url": "https://rajotuho.com/nama-unggas-burung-ayam-bebek-dalam-bahasa-lampung/",
+      "title": "Nama Unggas (Burung, Ayam, Bebek) Dalam Bahasa Lampung",
+      "status": "ok",
+      "topic": "language_learning",
+      "dialect_o_marker": true,
+      "blocks": 43,
+      "pairs": 27
+    },
+    {
+      "url": "https://rajotuho.com/nama-binatang-dalam-bahasa-lampung/",
+      "title": "Nama Binatang Dalam Bahasa Lampung",
+      "status": "ok",
+      "topic": "language_learning",
+      "dialect_o_marker": true,
+      "blocks": 60,
+      "pairs": 41
+    },
+    {
+      "url": "https://rajotuho.com/nama-hewan-ternak-dalam-bahasa-lampung-dan-keistimewaan-kerbau-pada-masyarakat-lampung/",
+      "title": "Nama Hewan Ternak Dalam Bahasa Lampung dan Keistimewaan Kerbau Pada Masyarakat Lampung",
+      "status": "ok",
+      "topic": "language_learning",
+      "dialect_o_marker": false,
+      "blocks": 3,
+      "pairs": 0
+    },
+    {
+      "url": "https://rajotuho.com/anggota-tubuh-dan-kaitannya-dalam-bahasa-lampung/",
+      "title": "Anggota Tubuh dan Kaitannya Dalam Bahasa Lampung",
+      "status": "ok",
+      "topic": "language_learning",
+      "dialect_o_marker": false,
+      "blocks": 2,
+      "pairs": 0
+    },
+    {
+      "url": "https://rajotuho.com/anggota-tubuh-dalam-bahasa-lampung/",
+      "title": "Anggota Tubuh Dalam Bahasa Lampung",
+      "status": "ok",
+      "topic": "language_learning",
+      "dialect_o_marker": false,
+      "blocks": 62,
+      "pairs": 0
+    },
+    {
+      "url": "https://rajotuho.com/asal-usul-kota-lampung/",
+      "title": "Asal Usul Kota Lampung",
+      "status": "ok",
+      "topic": "language_learning",
+      "dialect_o_marker": false,
+      "blocks": 0,
+      "pairs": 0
+    },
+    {
+      "url": "https://rajotuho.com/cuaca-dan-contoh-kalimatnya-dalam-bahasa-lampung/",
+      "title": "Cuaca dan Contoh Kalimatnya dalam Bahasa Lampung",
+      "status": "ok",
+      "topic": "language_learning",
+      "dialect_o_marker": true,
+      "blocks": 53,
+      "pairs": 27
+    },
+    {
+      "url": "https://rajotuho.com/perkenalan-dan-waktu-dalam-bahasa-lampung/",
+      "title": "Perkenalan dan Waktu Dalam Bahasa Lampung",
+      "status": "ok",
+      "topic": "introduction",
+      "dialect_o_marker": true,
+      "blocks": 55,
+      "pairs": 33
+    },
+    {
+      "url": "https://rajotuho.com/keterangan-tempat-dan-salam-dalam-bahasa-lampung-tabik-nyow-kabar-dak-jo-dak-neisihat-dijjo-dinnei/",
+      "title": "Keterangan Tempat dan Salam Dalam Bahasa Lampung (Tabik, Nyow Kabar, Dak Jo, Dak Nei,Sihat, Dijjo, Dinnei)",
+      "status": "ok",
+      "topic": "greeting",
+      "dialect_o_marker": true,
+      "blocks": 83,
+      "pairs": 63
+    },
+    {
+      "url": "https://rajotuho.com/belajar-bahasa-lampung-percakapan-sehari-hari/",
+      "title": "Belajar Bahasa Lampung Percakapan Sehari-hari",
+      "status": "ok",
+      "topic": "conversation",
+      "dialect_o_marker": true,
+      "blocks": 68,
+      "pairs": 42
+    }
+  ]
+}

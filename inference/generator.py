@@ -4,6 +4,9 @@ from typing import Iterator, Optional
 from tokenizer.tokenizer import MultilingualTokenizer
 from model.siger_model   import SigerLM
 
+from inference.sampler import Sampler
+import inference.generator
+
 
 class Generator:
     """
@@ -80,7 +83,7 @@ class Generator:
 
         # Decode — skip prompt, return generated only
         output_ids = generated_ids[len(input_ids):]
-        return self.tokenizer.decode(output_ids, skip_special_tokens=True)
+        return self.tokenizer.decode(output_ids, skip_special_tokens=False)
 
     @torch.inference_mode()
     def stream(

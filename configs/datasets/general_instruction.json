@@ -1,0 +1,35 @@
+{
+  "name": "general_instruction",
+  "output_path": "data/corpus/general_instruction_train.jsonl",
+  "shuffle_seed": 42,
+  "sources": [
+    {
+      "name": "lampung_augmented",
+      "path": "data/lampung/final/train_augmented_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI umum dengan kemampuan khusus Bahasa Lampung. Jawab akurat dan ringkas."
+    },
+    {
+      "name": "indonesian_text",
+      "path": "data/indonesian.txt",
+      "format": "text_completion",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI umum yang cerdas, ringkas, dan akurat."
+    },
+    {
+      "name": "english_text",
+      "path": "data/english.txt",
+      "format": "text_completion",
+      "weight": 1,
+      "system_prompt": "You are SigerLM, a concise and accurate general AI assistant."
+    },
+    {
+      "name": "code_text",
+      "path": "data/code.txt",
+      "format": "text_completion",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI yang membantu memahami dan melanjutkan kode."
+    }
+  ]
+}

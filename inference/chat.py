@@ -1,18 +1,16 @@
-# inference/chat.py
-import os
 from typing import Optional
+
+from memory import ContextManager, SessionMemory
+
 from .generator import Generator
 
 
 class ChatSession:
     """
-    Stateful chat session dengan history.
-    Analoginya: kayak Session di Laravel — state disimpan per user.
+    Stateful chat session backed by long-session memory.
 
-    Format conversation:
-    <|system|> ... <|end_turn|>
-    <|user|>   ... <|end_turn|>
-    <|assistant|> ... <|end_turn|>
+    The session keeps all turns in SessionMemory, retrieves relevant chunks,
+    keeps recent turns, and builds a bounded prompt through ContextManager.
     """
 
     SYSTEM_PROMPT = (
@@ -25,49 +23,29 @@ class ChatSession:
         self,
         generator: Generator,
         system_prompt: Optional[str] = None,
-        max_history: int = 10,          # max turn disimpan
-        max_context_tokens: int = 1024, # max total token dikirim ke model
+        max_history: int = 10,
+        max_context_tokens: int = 1024,
+        retrieval_top_k: int = 5,
     ):
-        self.generator         = generator
-        self.system_prompt     = system_prompt or self.SYSTEM_PROMPT
-        self.max_history       = max_history
+        self.generator = generator
+        self.system_prompt = system_prompt or self.SYSTEM_PROMPT
+        self.max_history = max_history
         self.max_context_tokens = max_context_tokens
-        self.history: list[dict] = []  # [{"role": ..., "content": ...}]
+        self.history: list[dict] = []
 
-    def _build_prompt(self) -> str:
-        """
-        Bangun prompt string dari history.
-        Format: system → [user/assistant turns] → assistant prefix
-        """
-        tok = self.generator.tokenizer
-        parts = []
-
-        # System
-        parts.append(
-            f"<|system|>{self.system_prompt}<|end_turn|>"
+        self.memory = SessionMemory(max_recent_turns=max_history)
+        self.context_manager = ContextManager(
+            tokenizer=self.generator.tokenizer,
+            memory=self.memory,
+            max_context_tokens=max_context_tokens,
+            retrieval_top_k=retrieval_top_k,
         )
 
-        # History turns
-        for turn in self.history:
-            role    = turn["role"]
-            content = turn["content"]
-            parts.append(f"<|{role}|>{content}<|end_turn|>")
-
-        # Prefix untuk response berikutnya
-        parts.append("<|assistant|>")
-
-        prompt = "\n".join(parts)
-
-        # Truncate kalau terlalu panjang
-        token_count = tok.count_tokens(prompt)
-        if token_count > self.max_context_tokens:
-            # Hapus history paling lama (kecuali system)
-            while len(self.history) > 2 and token_count > self.max_context_tokens:
-                self.history.pop(0)
-                prompt = self._build_prompt()
-                token_count = tok.count_tokens(prompt)
-
-        return prompt
+    def _build_prompt(self, user_input: str) -> str:
+        return self.context_manager.build_prompt(
+            user_message=user_input,
+            system_prompt=self.system_prompt,
+        )
 
     def chat(
         self,
@@ -75,17 +53,8 @@ class ChatSession:
         stream: bool = False,
         **gen_kwargs,
     ) -> str:
-        """
-        Kirim pesan, dapat respons.
-        stream=True → print karakter per karakter (terminal effect).
-        """
-        # Tambah user turn ke history
-        self.history.append({"role": "user", "content": user_input})
+        prompt = self._build_prompt(user_input)
 
-        # Build full prompt
-        prompt = self._build_prompt()
-
-        # Generate
         if stream:
             response = self._stream_response(prompt, **gen_kwargs)
         else:
@@ -94,49 +63,57 @@ class ChatSession:
                 stop_tokens=[
                     self.generator.tokenizer.special_tokens.get("<|end_turn|>"),
                     self.generator.tokenizer.special_tokens.get("<|user|>"),
+                    self.generator.tokenizer.special_tokens.get("<|assistant|>"),
                     self.generator.tokenizer.eos_id,
                 ],
-                **gen_kwargs
+                **gen_kwargs,
             )
 
-        # Simpan response ke history
+        self.history.append({"role": "user", "content": user_input})
         self.history.append({"role": "assistant", "content": response})
-
-        # Trim history kalau udah terlalu panjang
         if len(self.history) > self.max_history * 2:
-            self.history = self.history[-self.max_history * 2:]
+            self.history = self.history[-self.max_history * 2 :]
 
+        self.memory.add_turn("user", user_input)
+        self.memory.add_turn("assistant", response)
         return response
 
     def _stream_response(self, prompt: str, **kwargs) -> str:
-        """Stream response ke terminal, return full string."""
         full_response = ""
         print("Assistant: ", end="", flush=True)
 
-        stop_ids = [
-            self.generator.tokenizer.special_tokens.get("<|end_turn|>"),
-            self.generator.tokenizer.eos_id,
-        ]
-
         for token_str in self.generator.stream(prompt, **kwargs):
-            # Stop kalau ketemu end_turn dalam token string
-            if any(s in token_str for s in ["<|end_turn|>", "<|user|>"]):
+            if any(s in token_str for s in ["<|end_turn|>", "<|user|>", "<|assistant|>"]):
                 break
             print(token_str, end="", flush=True)
             full_response += token_str
 
-        print()  # newline setelah selesai
+        print()
         return full_response.strip()
 
-    def reset(self):
-        """Reset history — mulai percakapan baru."""
-        self.history.clear()
-        print("🔄 Chat session reset.")
+    def add_document(self, text: str, metadata: Optional[dict] = None) -> None:
+        self.memory.add_document(text, metadata=metadata)
 
-    def show_history(self):
-        """Print seluruh history."""
-        print(f"\n{'─'*50}")
+    def add_pinned_fact(self, fact: str) -> None:
+        self.memory.add_pinned_fact(fact)
+
+    def memory_stats(self) -> dict:
+        return {
+            "turns": len(self.memory.turns),
+            "chunks": len(self.memory.chunk_store.chunks),
+            "pinned_facts": len(self.memory.pinned_facts),
+            "summary_chars": len(self.memory.summary),
+            "max_context_tokens": self.max_context_tokens,
+        }
+
+    def reset(self) -> None:
+        self.history.clear()
+        self.memory.clear()
+        print("Chat session reset.")
+
+    def show_history(self) -> None:
+        print("\n" + "-" * 50)
         for turn in self.history:
             role = turn["role"].upper()
             print(f"[{role}]: {turn['content'][:100]}...")
-        print(f"{'─'*50}\n")
+        print("-" * 50 + "\n")

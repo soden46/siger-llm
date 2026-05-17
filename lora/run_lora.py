@@ -1,63 +1,42 @@
-# lora/run_lora.py
-from pathlib import Path
+import argparse
 import re
+import sys
+from pathlib import Path
 
 import torch
 
-from optimization.cpu.threading import configure_cpu
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from config.model_config import SigerConfig
-from model.siger_model import SigerLM
-from tokenizer.tokenizer import MultilingualTokenizer
 from lora.config import LoRAConfig
-from lora.model import LoRAModel
 from lora.dataset import InstructionDataset
+from lora.model import LoRAModel
 from lora.trainer import LoRATrainer
+from model.siger_model import SigerLM
+from optimization.cpu.threading import configure_cpu
+from optimization.hardware import detect_hardware, print_hardware_profile
+from tokenizer.hybrid_tokenizer import build_tokenizer
 
-
-# ============================================================
-# CHECKPOINT LOADER
-# ============================================================
 
 def load_checkpoint_state(checkpoint_path: str) -> dict:
-    """
-    Support dua format:
-    1. best_model.pt -> raw state_dict
-    2. step_*.pt     -> dict dengan key 'model_state'
-    """
     path = Path(checkpoint_path)
-
     if not path.exists():
         raise FileNotFoundError(
             f"Base checkpoint tidak ditemukan: {checkpoint_path}\n"
-            "Pastikan lu sudah menjalankan base training dan punya checkpoints/best_model.pt"
+            "Pastikan base training sudah menghasilkan checkpoints/best_model.pt."
         )
 
     checkpoint = torch.load(path, map_location="cpu")
-
     if isinstance(checkpoint, dict) and "model_state" in checkpoint:
         return checkpoint["model_state"]
-
     return checkpoint
 
 
 def infer_model_config_from_state_dict(state_dict: dict) -> SigerConfig:
-    """
-    Auto-infer konfigurasi model dari checkpoint.
-    Ini penting karena smoke checkpoint lu bisa:
-    - vocab_size=100271
-    - d_model=64
-    - n_layers=2
-
-    Sementara target model besar nanti bisa berbeda.
-    """
     if "embedding.weight" not in state_dict:
-        raise RuntimeError(
-            "Checkpoint tidak punya key embedding.weight, "
-            "tidak bisa infer SigerConfig."
-        )
+        raise RuntimeError("Checkpoint tidak punya key embedding.weight.")
 
     vocab_size, d_model = state_dict["embedding.weight"].shape
-
     layer_indices = set()
 
     for key in state_dict.keys():
@@ -66,49 +45,37 @@ def infer_model_config_from_state_dict(state_dict: dict) -> SigerConfig:
             layer_indices.add(int(match.group(1)))
 
     n_layers = max(layer_indices) + 1 if layer_indices else 0
-
     if n_layers == 0:
-        raise RuntimeError(
-            "Tidak bisa infer n_layers dari checkpoint."
-        )
+        raise RuntimeError("Tidak bisa infer n_layers dari checkpoint.")
 
     d_state = 16
     expand = 2
     d_conv = 4
 
-    a_log_key = "layers.0.ssm.A_log"
-    if a_log_key in state_dict:
-        d_inner, d_state = state_dict[a_log_key].shape
+    if "layers.0.ssm.A_log" in state_dict:
+        d_inner, d_state = state_dict["layers.0.ssm.A_log"].shape
         expand = max(1, d_inner // d_model)
 
-    conv_key = "layers.0.conv1d.weight"
-    if conv_key in state_dict:
-        d_conv = state_dict[conv_key].shape[-1]
+    if "layers.0.conv1d.weight" in state_dict:
+        d_conv = state_dict["layers.0.conv1d.weight"].shape[-1]
 
-    config = SigerConfig(
+    return SigerConfig(
         vocab_size=vocab_size,
         d_model=d_model,
         n_layers=n_layers,
         d_state=d_state,
         d_conv=d_conv,
         expand=expand,
-        max_seq_len=128,
+        max_seq_len=512,
     )
-
-    return config
 
 
 def load_base_model(checkpoint_path: str) -> SigerLM:
-    """
-    Load base model dari best_model.pt / step checkpoint,
-    lalu auto-reconstruct config dari shape checkpoint.
-    """
-    print("📦 Loading base checkpoint...")
+    print("Loading base checkpoint...")
     state_dict = load_checkpoint_state(checkpoint_path)
-
     model_config = infer_model_config_from_state_dict(state_dict)
 
-    print("🧠 Inferred base model config:")
+    print("Inferred base model config:")
     print(f"   vocab_size : {model_config.vocab_size}")
     print(f"   d_model    : {model_config.d_model}")
     print(f"   n_layers   : {model_config.n_layers}")
@@ -119,88 +86,109 @@ def load_base_model(checkpoint_path: str) -> SigerLM:
     model = SigerLM(model_config)
     model.load_state_dict(state_dict, strict=True)
     model.eval()
-
-    print("✅ Base model loaded successfully.")
+    print("Base model loaded successfully.")
     return model
 
 
-# ============================================================
-# MAIN
-# ============================================================
-
-def main():
-    configure_cpu(n_cores=2)
-
-    # ── 1. Config LoRA Lampung ────────────────────────────
-    lora_config = LoRAConfig(
-        rank=8,
+def default_lora_config(device: str) -> LoRAConfig:
+    return LoRAConfig(
+        rank=16,
         alpha=16.0,
         dropout=0.05,
-
         target_modules=[
             "in_proj",
             "out_proj",
             "x_proj",
             "dt_proj",
         ],
-
-        # Training awal CPU-safe
-        learning_rate=2e-4,
-        max_steps=300,
-        batch_size=2,
+        learning_rate=3e-4,
+        max_steps=3000,
+        batch_size=1,
         grad_accum=4,
-        warmup_steps=20,
-        max_seq_len=128,
+        warmup_steps=100,
+        max_seq_len=256,
         weight_decay=0.01,
-
-        # Dataset Lampung hasil pipeline kita
-        dataset_path="data/lampung/final/train_instruction.jsonl",
+        device=device,
+        prefer_gpu=True,
+        dataset_path="data/lampung/final/train_augmented_instruction.jsonl",
         max_samples=None,
-
-        # Base checkpoint hasil training main.py
         base_checkpoint="./checkpoints/best_model.pt",
-
-        # Save LoRA
-        save_dir="./checkpoints/lora",
-        save_every=100,
+        save_dir="./checkpoints/lora/lampung",
+        save_every=500,
         log_interval=10,
+        merged_output="./checkpoints/lora/model_lampung_merged.pt",
     )
 
-    # ── 2. Load base model ────────────────────────────────
+
+def load_lora_config(config_path: str | None, device: str) -> LoRAConfig:
+    if not config_path:
+        return default_lora_config(device)
+
+    config = LoRAConfig.from_json(config_path)
+    if config.device == "auto":
+        config.device = device
+    return config
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Train a SigerLM LoRA adapter.")
+    parser.add_argument(
+        "--config",
+        help="Optional LoRA training config JSON, e.g. configs/training/general_lora.json",
+    )
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    hardware = detect_hardware(prefer_gpu=True)
+    print_hardware_profile(hardware)
+
+    if hardware.device == "cpu":
+        n_cores = 1 if hardware.ram_gb < 3.0 else min(2, hardware.cpu_cores)
+        configure_cpu(n_cores=n_cores)
+
+    lora_config = load_lora_config(args.config, hardware.device)
+    print(f"Training dataset: {lora_config.dataset_path or lora_config.dataset_name}")
+    print(f"Save dir: {lora_config.save_dir}")
+
     base_model = load_base_model(lora_config.base_checkpoint)
 
-    # ── 3. Inject LoRA ────────────────────────────────────
-    print("\n🧩 Injecting LoRA adapters...")
+    print("\nInjecting LoRA adapters...")
     lora_model = LoRAModel(base_model, lora_config)
 
-    # ── 4. Load tokenizer + dataset Lampung ───────────────
-    tokenizer = MultilingualTokenizer()
+    tokenizer = build_tokenizer("auto")
+    print(f"Tokenizer backend: {tokenizer.backend} | vocab_size={tokenizer.vocab_size}")
+
+    if tokenizer.vocab_size != base_model.config.vocab_size:
+        raise RuntimeError(
+            "Tokenizer vocab_size tidak cocok dengan base checkpoint. "
+            f"tokenizer={tokenizer.vocab_size}, model={base_model.config.vocab_size}. "
+            "Pakai tokenizer yang sama dengan saat base model dilatih, atau retrain base model."
+        )
 
     dataset = InstructionDataset(
         tokenizer=tokenizer,
         dataset_path=lora_config.dataset_path,
+        dataset_name=lora_config.dataset_name,
+        split=lora_config.dataset_split,
         max_seq_len=lora_config.max_seq_len,
         max_samples=lora_config.max_samples,
     )
 
-    # ── 5. Train LoRA ─────────────────────────────────────
     trainer = LoRATrainer(
         lora_model=lora_model,
         config=lora_config,
         tokenizer=tokenizer,
     )
-
     trainer.train(dataset)
 
-    # ── 6. Merge adapter ke base model ────────────────────
-    print("\n🔀 Merging LoRA into base model...")
+    print("\nMerging LoRA into base model...")
+    lora_model.merge_and_export(lora_config.merged_output)
 
-    merged_path = "./checkpoints/lora/model_lampung_merged.pt"
-    lora_model.merge_and_export(merged_path)
-
-    print("🎉 Done!")
+    print("Done.")
     print(f"   LoRA adapters saved in : {lora_config.save_dir}")
-    print(f"   Merged model saved at  : {merged_path}")
+    print(f"   Merged model saved at  : {lora_config.merged_output}")
 
 
 if __name__ == "__main__":

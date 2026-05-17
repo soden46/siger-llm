@@ -1,290 +1,206 @@
-# 🤖 AGENTS.md — Panduan untuk AI Agents & LLM Tools
+# AGENTS.md - Panduan AI Agents untuk SigerLM
 
-Dokumen ini ditujukan untuk **AI agents, coding assistants, dan LLM tools** (seperti Claude, Cursor, Copilot, dsb) yang bekerja dengan codebase SigerLM.
-
----
+Dokumen ini dipakai oleh AI coding assistants yang bekerja di repository SigerLM.
 
 ## Project Summary
 
-SIGER_LLM adalah implementasi Large Language Model berbasis **State Space Model (Mamba)** yang dioptimasi untuk CPU-only deployment. Dibangun dengan PyTorch, menggunakan tiktoken untuk tokenisasi, ONNX Runtime untuk inference, dan FastAPI untuk serving.
+SigerLM adalah framework eksperimen Large Language Model berbasis State Space Model/Mamba-like architecture. Target utama proyek sekarang adalah membangun LM general yang modular, ringan, dan bisa diuji di CPU/VPS. Dataset Bahasa Lampung dipakai sebagai domain adapter dan testbed training, bukan sebagai batas kemampuan model.
 
-**Stack utama:**
-- Language   : Python 3.11
-- Framework  : PyTorch 2.2+
-- Tokenizer  : tiktoken (cl100k_base)
-- Inference  : ONNX Runtime
-- API        : FastAPI + uvicorn
-- Fine-tuning: LoRA (custom implementation)
+Stack utama:
 
----
+- Python 3.11
+- PyTorch
+- Custom SSM/Mamba-like model
+- Hybrid tokenizer: HF ByteLevel BPE bila tersedia, fallback tiktoken
+- LoRA fine-tuning custom
+- FastAPI/ONNX/quantization untuk deployment
+- Retrieval/rule layer untuk domain Lampung
 
-## Struktur Codebase
+## Current Architecture
 
-```
-siger-llm/
-├── config/model_config.py          # SigerConfig dataclass — BACA INI DULU
-├── model/
-│   ├── ssm_core.py                 # Core SSM math (A, B, C, D matrices)
-│   ├── ssm_block.py                # Satu SSM block lengkap
-│   └── siger_model.py              # Full model: embed → blocks → LM head
-├── tokenizer/tokenizer.py          # MultilingualTokenizer (tiktoken wrapper)
-├── tokenizer/special_tokens.py     # Semua special token dan ID-nya
-├── training/trainer.py             # Main training loop
-├── training/optimizer.py           # AdamW + CosineScheduler
-├── lora/
-│   ├── layer.py                    # LoRALinear — core LoRA math
-│   └── model.py                    # LoRAModel — inject/save/load/merge
-├── optimization/
-│   ├── quantization/quantize.py    # INT8/INT4 quantization
-│   └── onnx/export.py              # ONNX export + ONNXGenerator
-├── inference/
-│   ├── generator.py                # Generator + stream()
-│   ├── sampler.py                  # Sampler.sample() — temperature/top-k/top-p
-│   └── chat.py                     # ChatSession
-├── evaluation/runner.py            # EvaluationRunner — jalanin semua eval
-└── deploy.py                       # Entry point deployment
+```txt
+raw data / domain data
+  -> tools/build_* or tools/build_instruction_corpus.py
+  -> unified instruction corpus
+  -> tokenizer/hybrid_tokenizer.py
+  -> base training or LoRA fine-tuning
+  -> merged checkpoint
+  -> inference router
+  -> general chat or Lampung domain tools
 ```
 
----
+Core LM harus tetap general:
 
-## Konvensi Kode
+- `model/` berisi arsitektur model.
+- `training/` berisi base training dan dataset registry.
+- `lora/` berisi instruction tuning.
+- `inference/` berisi generator, chat, router, dan pipeline domain.
+- `retrieval/` berisi lookup/lexicon/compositional translator untuk Lampung.
+- `tools/` berisi builder/extractor dataset.
+- `configs/` berisi registry dataset dan config training.
 
-### Naming
+Lampung-specific code tidak boleh ditaruh di core model. Taruh di `retrieval/`, `inference/lampung_pipeline.py`, dan `tools/build_lampung_dataset.py`.
 
-```python
-# Kelas     : PascalCase
-class SigerLM, LoRAModel, ChatSession
+## Important Files
 
-# Fungsi    : snake_case
-def build_optimizer(), def encode_batch()
-
-# Konstanta : UPPER_SNAKE
-SPECIAL_TOKENS = {...}
-IGNORE_INDEX   = -100
-
-# Config    : dataclass dengan field bernama jelas
-@dataclass
-class SigerConfig:
-    vocab_size: int = 100277
-    d_model:    int = 512
+```txt
+config/model_config.py                 SigerConfig, baca sebelum ubah model
+config/__init__.py                     import package guard
+model/siger_model.py                   full LM
+tokenizer/hybrid_tokenizer.py          tokenizer selector
+training/dataset_registry.py           general dataset registry
+tools/build_instruction_corpus.py      unified corpus builder
+configs/datasets/general_instruction.json
+configs/datasets/lampung_instruction.json
+configs/training/general_lora.json
+configs/training/lampung_lora.json
+lora/run_lora.py                       config-driven LoRA runner
+lora/dataset.py                        instruction/chat formatting
+inference/router.py                    general vs domain router
+inference/lampung_pipeline.py          Lampung lookup-first pipeline
+retrieval/instruction_lookup.py        exact and bag-of-words lookup
+retrieval/compositional_translator.py  rule composer ID/LO/EN
+chat_cli.py                            local CLI smoke tests
 ```
 
-### Type Hints
+## Coding Rules
 
-Selalu gunakan type hints untuk fungsi publik:
+- Prefer incremental changes. Do not rewrite the whole project unless asked.
+- Keep the model architecture independent from Lampung-specific logic.
+- Use type hints for public functions.
+- Use `rg` for search.
+- Use `apply_patch` for manual edits.
+- Do not change special token IDs casually.
+- Do not change default model config unless backward compatibility is considered.
+- Do not revert user changes. The worktree can be dirty.
+- Keep CPU/VPS constraints in mind: 2 cores, 4GB RAM target.
 
-```python
-def encode(
-    self,
-    text: str,
-    add_bos: bool = False,
-    lang: Optional[str] = None,
-) -> List[int]:
+## Dataset Rules
+
+Preferred instruction row:
+
+```json
+{"instruction":"...","input":"...","output":"...","system":"optional system prompt","source":"...","type":"..."}
 ```
 
-### Tensor Shape Conventions
+Preferred chat row for registry sources:
 
-```python
-# Selalu dokumentasikan shape tensor sebagai komentar:
-x: torch.Tensor  # (B, L, d_model)  — B=batch, L=seq_len
-logits: torch.Tensor  # (B, L, vocab_size)
-h: torch.Tensor  # (B, d_inner, d_state)  — SSM hidden state
+```json
+{"messages":[{"role":"user","content":"..."},{"role":"assistant","content":"..."}]}
 ```
 
----
+Dataset registry sources currently support:
 
-## Pola Umum yang Sering Dipakai
+- `instruction_jsonl`
+- `chat_jsonl`
+- `text_completion`
 
-### 1. Forward Pass
+Build corpora:
 
-```python
-# Selalu: model(input_ids) → (logits, loss)
-logits, loss = model(input_ids, targets=labels)
-
-# Inference only (tanpa targets):
-logits, _ = model(input_ids)
-next_logits = logits[0, -1, :]  # ambil token terakhir
+```powershell
+python tools\build_instruction_corpus.py --registry configs\datasets\lampung_instruction.json
+python tools\build_instruction_corpus.py --registry configs\datasets\general_instruction.json
 ```
 
-### 2. Encode/Decode
+## Training Commands
 
-```python
-# Encode selalu return List[int]
-ids = tokenizer.encode(text, add_bos=True, add_eos=True, lang="id")
+Lampung-only LoRA:
 
-# Decode selalu return str
-text = tokenizer.decode(ids, skip_special_tokens=True)
+```powershell
+python tools\build_instruction_corpus.py --registry configs\datasets\lampung_instruction.json
+python lora\run_lora.py --config configs\training\lampung_lora.json
 ```
 
-### 3. Checkpoint
+General LoRA:
 
-```python
-# Save
-torch.save(model.state_dict(), path)
-
-# Load (efficient)
-model.load_state_dict(
-    torch.load(path, map_location="cpu", weights_only=True),
-    assign=True
-)
+```powershell
+python tools\build_instruction_corpus.py --registry configs\datasets\general_instruction.json
+python lora\run_lora.py --config configs\training\general_lora.json
 ```
 
-### 4. LoRA Pattern
+Default `python lora\run_lora.py` remains a Lampung-safe default for backward compatibility.
 
-```python
-# Inject → Train → Save → Load → Merge
-lora_model = LoRAModel(base_model, config)   # inject
-trainer.train(dataset)                         # train
-lora_model.save_lora("lora.pt")              # save (kecil!)
-lora_model.load_lora("lora.pt")              # load
-merged = lora_model.merge_and_export("merged.pt")  # merge
+## Current Verified Results
+
+Latest local smoke results:
+
+```txt
+Lampung processed PDF conversations: 3100 rows
+Synthetic compositional rows: 1968
+final train/valid/test: 4325 / 541 / 541
+train rows with English field: 1605
+train_augmented_instruction: 32059 rows
+general_instruction_train: 30704 rows
+lampung_instruction_train: 30701 rows
 ```
 
----
+CLI mode `0` auto-routes:
 
-## Constraints & Gotchas
-
-### Memory
-
-- VPS target: 2 core, 4GB RAM. **Selalu** pertimbangkan RAM usage.
-- Batch size default (8) mungkin perlu diturunkan ke 2-4 di VPS
-- Gunakan `load_model_efficient()` bukan `torch.load()` langsung
-- `max_seq_len` di inference sebaiknya tidak lebih dari 1024
-
-### Tensor Device
-
-```python
-# Model dan input harus di device yang sama
-x = x.to(self.device)  # selalu pindahkan input ke device model
-
-# Jangan lupa .cpu() sebelum numpy atau json serialization
-value = tensor.cpu().numpy()
+```txt
+Input: Nyak haga mengan manuk di warung paghek jalan
+Route: lampung_to_id
+Source: exact instruction lookup
+Output: aku mau makan ayam di warung dekat jalan
 ```
 
-### ONNX
+Lampung O -> English examples:
 
-- ONNX session tidak support `torch.Tensor` input — gunakan `np.ndarray`
-- Dynamic axes (`batch` dan `seq_len`) sudah di-set saat export
-- Jangan gunakan ONNX session bersamaan dari multiple thread tanpa lock
+```txt
+Nyak haga mengan manuk di warung paghek jalan
+-> i want to eat chicken at the stall near the road
 
-### LoRA
-
-- `lora_A` di-init dengan kaiming uniform, `lora_B` dengan zeros
-- Jangan freeze LoRA params saat training LoRA
-- `model.parameters()` setelah inject LoRA akan include frozen base params
-- Untuk optimizer, filter: `[p for p in model.parameters() if p.requires_grad]`
-
-### Tokenizer
-
-- Token ID `100257-100270` adalah special tokens (bukan vocabulary biasa)
-- Selalu gunakan `skip_special_tokens=True` saat decode untuk output bersih
-- `count_tokens()` lebih efisien dari `len(encode())` untuk hitung panjang
-
----
-
-## Common Tasks untuk Agent
-
-### Task: Tambah Layer Baru ke Model
-
-```python
-# 1. Edit config/model_config.py — tambah field baru
-# 2. Edit model/ssm_block.py — implementasi layer
-# 3. Edit model/siger_model.py — integrasikan
-# 4. Pastikan forward() signature tetap: (input_ids, targets=None) → (logits, loss)
-# 5. Test: python -c "from model.siger_model import SigerLM; ..."
+Nyak ago belei buku di pasar
+-> i want to buy a book at the market
 ```
-
-### Task: Tambah Special Token Baru
-
-```python
-# 1. Edit tokenizer/special_tokens.py
-SPECIAL_TOKENS["<|new_token|>"] = 100271  # increment dari yang terakhir
-ID_TO_SPECIAL = {v: k for k, v in SPECIAL_TOKENS.items()}  # rebuild reverse map
-
-# 2. Rebuild tokenizer encoder di tokenizer/tokenizer.py (_build_encoder)
-# 3. Update vocab_size di config jika perlu
-```
-
-### Task: Tambah Dataset Format Baru
-
-```python
-# Di lora/dataset.py, tambah case baru di format_instruction():
-elif "new_dataset" in dataset_name:
-    instruction = example.get("instruction", "")
-    response    = example.get("response", "")
-    return (
-        f"<|system|>...<|end_turn|>\n"
-        f"<|user|>{instruction}<|end_turn|>\n"
-        f"<|assistant|>{response}<|end_turn|>"
-    )
-```
-
-### Task: Tambah Benchmark Baru
-
-```python
-# Di evaluation/benchmarks.py atau evaluation/indo_eval.py:
-# 1. Tambah method baru
-def evaluate_new_benchmark(self, n_samples=200) -> Dict:
-    dataset = load_dataset("dataset/name", split="test")
-    # ... scoring logic ...
-    return {"accuracy": ..., "total": ...}
-
-# 2. Register di evaluation/runner.py
-results["new_bench"] = mc_eval.evaluate_new_benchmark(n_samples)
-```
-
----
 
 ## Testing
 
-```bash
-# Unit test tokenizer
-python -m tokenizer.tests.test_tokenizer
+Run relevant compile checks after edits:
 
-# Smoke test model
-python -c "
-import torch
-from config.model_config import SigerConfig
-from model.siger_model   import SigerLM
-
-config = SigerConfig(vocab_size=1000, d_model=64, n_layers=2)
-model  = SigerLM(config)
-x      = torch.randint(0, 1000, (2, 32))
-logits, _ = model(x)
-assert logits.shape == (2, 32, 1000), f'Wrong shape: {logits.shape}'
-print('✅ All tests passed')
-"
-
-# Full test suite
-pytest tests/ -v
+```powershell
+python -m py_compile chat_cli.py inference\router.py inference\lampung_pipeline.py retrieval\instruction_lookup.py retrieval\compositional_translator.py
+python -m py_compile training\dataset_registry.py tools\build_instruction_corpus.py lora\config.py lora\dataset.py lora\run_lora.py
 ```
 
----
+CLI smoke:
 
-## Urutan Modifikasi yang Aman
-
-Ketika membuat perubahan besar, ikuti urutan ini agar tidak ada yang break:
-
-```
-1. config/model_config.py     ← tambah config baru
-2. model/ssm_core.py          ← perubahan math SSM
-3. model/ssm_block.py         ← perubahan block structure
-4. model/siger_model.py       ← integrasi di level model
-5. tokenizer/special_tokens.py ← kalau ada token baru
-6. tokenizer/tokenizer.py     ← kalau ada logic tokenizer baru
-7. training/dataset.py        ← kalau ada format data baru
-8. lora/layer.py + model.py   ← kalau ada perubahan LoRA
-9. inference/generator.py     ← kalau ada perubahan generation
-10. evaluation/               ← tambah metric baru
+```powershell
+@'
+0
+Nyak haga mengan manuk di warung paghek jalan
+exit
+'@ | python chat_cli.py
 ```
 
----
+Model smoke:
 
-## File yang TIDAK Boleh Dimodifikasi Tanpa Review
+```powershell
+python -c "import torch; from config.model_config import SigerConfig; from model.siger_model import SigerLM; c=SigerConfig(vocab_size=1000,d_model=64,n_layers=2); m=SigerLM(c); x=torch.randint(0,1000,(2,32)); y,_=m(x); assert y.shape==(2,32,1000); print('ok')"
+```
 
-```
-tokenizer/special_tokens.py   ← perubahan ID token merusak checkpoint
-config/model_config.py         ← perubahan default merusak backward compat
-model/ssm_core.py              ← math SSM harus tetap konsisten
-lora/layer.py                  ← init strategy (kaiming A, zero B) krusial
-```
+## Safe Modification Order
+
+For model changes:
+
+1. `config/model_config.py`
+2. `model/ssm_core.py`
+3. `model/ssm_block.py`
+4. `model/siger_model.py`
+5. tests/smoke
+
+For dataset/training changes:
+
+1. `configs/datasets/*.json`
+2. `tools/build_instruction_corpus.py` or domain builder
+3. `lora/dataset.py`
+4. `configs/training/*.json`
+5. `lora/run_lora.py`
+6. compile + corpus build
+
+For inference changes:
+
+1. `inference/prompt_builder.py`
+2. `inference/lampung_pipeline.py` if domain-specific
+3. `inference/router.py` if routing behavior changes
+4. `chat_cli.py`
+5. CLI smoke

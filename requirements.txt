@@ -61,9 +61,14 @@ requests>=2.32.0               # HTTP requests untuk scraping/download
 
 # ── Translation & NLP Utilities ──────────────────────────────
 sentencepiece>=0.2.0           # optional tokenizer experiments
+tokenizers>=0.20.0             # custom GPT-style ByteLevel BPE tokenizer
+transformers>=4.45.0           # PreTrainedTokenizerFast / HF tokenizer tooling
 sacremoses>=0.1.1              # SMT preprocessing/tokenization
 langdetect>=1.0.9              # language detection
 
 # ── JSONL & Data Processing ──────────────────────────────────
 orjson>=3.10.0                 # faster JSON serialization
 jsonlines>=4.0.0               # JSONL reader/writer
+
+onnxscript>=0.1.0
+

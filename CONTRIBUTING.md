@@ -1,110 +1,89 @@
-# Contributing to SIGER LLM
+# Contributing to SigerLM
 
-Terima kasih sudah tertarik berkontribusi ke **SIGER LLM**.
+Thanks for helping improve SigerLM.
 
-SIGER adalah eksperimen general-purpose language model yang dibangun dari scratch menggunakan arsitektur State Space Model/SSM, lengkap dengan pipeline training, LoRA fine-tuning, evaluasi, optimasi, dan eksperimen low-resource language.
+SigerLM is an experimental general-purpose LM framework built around a custom SSM/Mamba-like architecture. Bahasa Lampung is currently the first domain adapter and training testbed.
 
-Saat ini, Bahasa Lampung Dialek O digunakan sebagai salah satu objek eksperimen awal untuk pengembangan dataset translasi.
+## Useful Contributions
 
----
+- bug fixes
+- documentation updates
+- dataset builders
+- legal and well-sourced datasets
+- general instruction/chat corpora
+- Lampung O/Nyo validation data
+- evaluation scripts
+- CPU inference improvements
+- LoRA training recipes
 
-## Cara Berkontribusi
+## Before Opening a PR
 
-Kontribusi yang diterima antara lain:
+1. Keep changes scoped.
+2. Do not commit checkpoints or large raw datasets unless explicitly requested.
+3. Run relevant compile/smoke commands.
+4. Update docs when commands, architecture, or behavior changes.
+5. Mention dataset sources and license/usage notes.
 
-- Perbaikan bug
-- Peningkatan dokumentasi
-- Penambahan evaluasi atau benchmark
-- Optimasi inference/training
-- Perbaikan arsitektur model
-- Penambahan dataset yang legal dan relevan
-- Validasi dataset Bahasa Lampung Dialek O
-- Penambahan contoh percakapan atau parallel sentence yang sudah ditinjau
+## Setup
 
----
-
-## Sebelum Membuat Pull Request
-
-Sebelum mengirim PR:
-
-1. Pastikan branch sudah up to date dengan `main`
-2. Jalankan test atau smoke test yang relevan
-3. Pastikan tidak ada file besar, checkpoint, dataset mentah, atau secret yang ikut ter-commit
-4. Jelaskan perubahan secara ringkas dan jelas
-5. Sertakan contoh output jika perubahan memengaruhi training, scraping, dataset, atau inference
-
----
-
-## Setup Lokal
-
-```bash
-git clone https://github.com/soden46/siger-llm.git
-cd siger-llm
-
+```powershell
 python -m venv .venv
-.venv\Scripts\activate
-
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+```
 
-Menjalankan Smoke Test
-python main.py
+## Smoke Checks
 
-Untuk LoRA Lampung:
+```powershell
+python -m py_compile chat_cli.py inference\router.py inference\lampung_pipeline.py
+python -m py_compile training\dataset_registry.py tools\build_instruction_corpus.py lora\run_lora.py
+```
 
-python -m lora.run_lora
-Kontribusi Dataset Lampung Dialek O
+## Dataset Contribution Format
 
-Dataset yang sangat dibutuhkan:
+Instruction JSONL:
 
-Percakapan sehari-hari
-Sapaan dan perkenalan
-Aktivitas rumah dan sekolah
-Dialog pasar
-Cerita pendek
-Ungkapan budaya
-Parallel sentence Lampung O ↔ Indonesia
-Terjemahan English opsional
+```json
+{"instruction":"Apa itu AI?","input":"","output":"AI adalah teknologi yang membantu komputer belajar dari data.","source":"manual","type":"qa"}
+```
 
-Format JSONL yang disarankan:
+Lampung pair JSONL:
 
-{
-  "dialect": "o",
-  "lampung": "api kabar niku?",
-  "indonesian": "apa kabar kamu?",
-  "english": "how are you?",
-  "source": "manual_native_review",
-  "type": "daily_conversation"
-}
+```json
+{"dialect":"o","lampung":"api kabar niku?","indonesian":"apa kabar kamu?","english":"how are you?","source":"manual_native_review","type":"daily_conversation"}
+```
 
-Mohon pastikan:
+Chat JSONL:
 
-Data tidak diambil dari sumber yang melarang penggunaan ulang
-Sumber dicantumkan bila berasal dari publikasi/artikel
-Data sebisa mungkin divalidasi penutur atau reviewer yang memahami Dialek O
-Gaya Commit
+```json
+{"messages":[{"role":"user","content":"Apa itu AI?"},{"role":"assistant","content":"AI adalah teknologi yang membantu komputer melakukan tugas cerdas."}]}
+```
 
-Gunakan commit message yang jelas. Contoh:
+## Dataset Rules
 
-feat: add Lampung conversation dataset parser
-fix: handle empty instruction dataset after tokenization
-docs: update SIGER architecture overview
-refactor: rename Mamba references to SIGER naming
-Membuat Issue
+- Do not add data from sources that prohibit reuse.
+- Include the source field.
+- Mark synthetic data with `"synthetic": true`.
+- Prefer native-speaker validation for Lampung data.
+- Keep general-chat data separate through `configs/datasets/general_instruction.json`.
 
-Gunakan issue template yang tersedia:
+## Current Training Commands
 
-Bug Report
-Feature Request
+```powershell
+python tools\build_instruction_corpus.py --registry configs\datasets\lampung_instruction.json
+python lora\run_lora.py --config configs\training\lampung_lora.json
 
-Jelaskan konteks, langkah reproduksi, dan ekspektasi hasil dengan lengkap.
+python tools\build_instruction_corpus.py --registry configs\datasets\general_instruction.json
+python lora\run_lora.py --config configs\training\general_lora.json
+```
 
-Code Review
+## Commit Style
 
-Maintainer berhak:
+Use clear commit messages:
 
-meminta revisi
-menolak perubahan yang tidak sesuai scope proyek
-meminta bukti sumber dataset
-meminta benchmark tambahan untuk perubahan performa
-
-Terima kasih sudah membantu mengembangkan SIGER LLM.
+```txt
+feat: add general dataset registry
+fix: handle empty text completion source
+docs: update SigerLM architecture docs
+test: add router smoke coverage
+```

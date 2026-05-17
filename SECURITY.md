@@ -1,54 +1,45 @@
 # Security Policy
 
-## Supported Versions
+SigerLM is an experimental personal research project. Security support currently applies to the main branch only.
 
-SIGER LLM masih berada pada tahap eksperimen aktif. Untuk saat ini, hanya branch utama yang mendapat perhatian terhadap isu keamanan.
+## Supported Versions
 
 | Version | Supported |
 |---|---|
-| `main` | ✅ |
-| older snapshots | ❌ |
-
----
+| `main` | yes |
+| older snapshots | no |
 
 ## Reporting a Vulnerability
 
-Jika menemukan isu keamanan, mohon **jangan langsung membuat public issue** yang berisi detail eksploitasi.
+Please do not open a public issue with exploit details.
 
-Laporkan secara privat melalui:
+Report privately by email:
 
-- Email: `syarifsoden30@gmail.com`
+```txt
+syarifsoden30@gmail.com
+```
 
-Sertakan:
+Include:
 
-- ringkasan masalah
-- langkah reproduksi
-- dampak potensial
-- file atau modul terkait
-- saran mitigasi jika ada
+- short summary
+- reproduction steps
+- affected files/modules
+- potential impact
+- suggested mitigation, if known
 
----
+## In Scope
 
-## Scope
-
-Contoh isu yang layak dilaporkan:
-
-- kebocoran secret/token
-- path traversal pada API/inference server
+- leaked secrets or tokens
 - unsafe file loading
-- command execution yang tidak semestinya
-- dependency risk dengan dampak nyata
-- scraping pipeline yang bisa mengekspos credential
+- path traversal in API/server code
+- unintended command execution
+- dependency risk with practical impact
+- dataset/scraping workflows that expose credentials
 
----
+## Out of Scope
 
-## Response Expectations
+- model hallucination as a security issue by itself
+- low-quality generated text
+- benchmark inaccuracies without security impact
 
-Maintainer akan berusaha:
-
-1. Mengonfirmasi laporan
-2. Meninjau dampak
-3. Menyusun perbaikan bila valid
-4. Memberi kredit kepada pelapor jika disetujui
-
-Karena proyek ini masih eksperimental dan dikelola secara personal, waktu respons dapat bervariasi.
+Because this is an experimental project, response time may vary.

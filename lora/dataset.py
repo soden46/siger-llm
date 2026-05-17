@@ -20,8 +20,8 @@ RECOMMENDED_DATASETS = {
 
 
 SYSTEM_PROMPT = (
-    "Kamu adalah asisten penerjemah bahasa yang akurat. "
-    "Ikuti instruksi user dan berikan jawaban singkat sesuai permintaan."
+    "Kamu adalah SigerLM, asisten AI umum yang cerdas, ringkas, dan akurat. "
+    "Ikuti instruksi user dan jawab sesuai konteks."
 )
 
 
@@ -39,8 +39,10 @@ def format_local_instruction(example: Dict) -> str:
     <|user|>instruction + input<|end_turn|>
     <|assistant|>output<|end_turn|>
     """
+    system_prompt = str(example.get("system", SYSTEM_PROMPT)).strip() or SYSTEM_PROMPT
     instruction = str(example.get("instruction", "")).strip()
     input_text = str(example.get("input", "")).strip()
+    reasoning = str(example.get("reasoning", "")).strip()
     output = str(example.get("output", "")).strip()
 
     if not instruction or not output:
@@ -51,10 +53,18 @@ def format_local_instruction(example: Dict) -> str:
     else:
         user_message = instruction
 
+    if reasoning:
+        assistant_message = (
+            f"Penjelasan:\n{reasoning}\n\n"
+            f"Jawaban:\n{output}"
+        )
+    else:
+        assistant_message = output
+
     return (
-        f"<|system|>{SYSTEM_PROMPT}<|end_turn|>\n"
+        f"<|system|>{system_prompt}<|end_turn|>\n"
         f"<|user|>{user_message}<|end_turn|>\n"
-        f"<|assistant|>{output}<|end_turn|>"
+        f"<|assistant|>{assistant_message}<|end_turn|>"
     )
 
 
@@ -148,12 +158,12 @@ class InstructionDataset(Dataset):
         if max_samples is not None:
             raw_examples = raw_examples[:max_samples]
 
-        print(f"📥 Loading instruction dataset: {source_label}")
-        print(f"📊 Raw examples: {len(raw_examples):,}")
+        print(f"Loading instruction dataset: {source_label}")
+        print(f"Raw examples: {len(raw_examples):,}")
 
         self.examples = self._process(raw_examples, formatter)
 
-        print(f"✅ Dataset ready: {len(self.examples):,} valid examples")
+        print(f"Dataset ready: {len(self.examples):,} valid examples")
 
         if len(self.examples) == 0:
             raise RuntimeError(
@@ -179,7 +189,7 @@ class InstructionDataset(Dataset):
                 try:
                     row = json.loads(line)
                 except json.JSONDecodeError as e:
-                    print(f"⚠️  Skip JSON invalid line {line_number}: {e}")
+                    print(f"Skip JSON invalid line {line_number}: {e}")
                     continue
 
                 rows.append(row)

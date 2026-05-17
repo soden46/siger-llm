@@ -5,6 +5,14 @@ import onnxruntime as ort
 import numpy as np
 from pathlib import Path
 
+class LogitsOnlyWrapper(torch.nn.Module):
+    def __init__(self, model):
+        super().__init__()
+        self.model = model
+
+    def forward(self, input_ids):
+        logits, _ = self.model(input_ids)
+        return logits
 
 class ONNXExporter:
     """
@@ -18,6 +26,8 @@ class ONNXExporter:
         self.save_dir = Path(save_dir)
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
+    
+
     def export(
         self,
         seq_len: int     = 64,
@@ -28,20 +38,24 @@ class ONNXExporter:
 
         onnx_path = str(self.save_dir / "model.onnx")
         dummy_input = torch.randint(0, 1000, (batch_size, seq_len))
+        export_model = LogitsOnlyWrapper(self.model)
+        export_model.eval()
 
-        torch.onnx.export(
-            self.model,
-            dummy_input,
-            onnx_path,
-            input_names=["input_ids"],
-            output_names=["logits"],
-            dynamic_axes={
-                "input_ids": {0: "batch", 1: "seq_len"},
-                "logits":    {0: "batch", 1: "seq_len"},
-            },
-            opset_version=opset,
-            do_constant_folding=True,   # fold constant ops = lebih cepat
-        )
+        with torch.no_grad():
+            torch.onnx.export(
+                export_model,
+                dummy_input,
+                onnx_path,
+                input_names=["input_ids"],
+                output_names=["logits"],
+                dynamic_axes={
+                    "input_ids": {0: "batch", 1: "seq_len"},
+                    "logits":    {0: "batch", 1: "seq_len"},
+                },
+                opset_version=18,
+                do_constant_folding=True,
+                dynamo=False,
+            )
 
         # Verify
         onnx_model = onnx.load(onnx_path)
