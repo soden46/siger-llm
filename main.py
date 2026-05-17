@@ -17,8 +17,8 @@ TRAIN_CONFIG = {
     
     # Model kecil dulu buat smoke test
     "vocab_size": 100271,
-    "d_model": 64,
-    "n_layers": 2,
+    "d_model": 256,
+    "n_layers": 8,
 
     # Training
     # "max_steps":     100_000,
@@ -28,9 +28,9 @@ TRAIN_CONFIG = {
     # "grad_accum_steps": 4,      # effective batch = 8 * 4 = 32
 
     # Training kecil
-    "max_steps": 3000,
-    "batch_size": 2,
-    "max_seq_len": 32,
+    "max_steps": 1500,
+    "batch_size": 256,
+    "max_seq_len": 32 ,
     "grad_accum_steps": 1,
 
     # Optimizer
@@ -41,9 +41,9 @@ TRAIN_CONFIG = {
     # "grad_clip":     1.0,
 
      # Optimizer
-    "max_lr": 3e-4,
-    "min_lr": 3e-5,
-    "warmup_steps": 5,
+    "max_lr": 5e-4,
+    "min_lr": 5e-5,
+    "warmup_steps": 100,
     "weight_decay": 0.1,
     "grad_clip": 1.0,
 
@@ -54,8 +54,8 @@ TRAIN_CONFIG = {
     # "num_workers":   2,
 
     # Logging & saving
-    "log_interval": 1,
-    "save_every": 10,
+    "log_interval": 10,
+    "save_every": 500,
     "checkpoint_dir": "./checkpoints",
     "num_workers": 0,
 }

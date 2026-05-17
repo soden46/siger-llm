@@ -73,18 +73,16 @@ class Trainer:
         dataset: TextDataset,
         resume: bool = True,
     ):
-        """
-        Main training loop.
-        Analoginya ke Laravel queue worker:
-        while ada job → proses → simpan state.
-        """
+        """Main training loop."""
         dataloader = self._build_dataloader(dataset)
-        scaler = torch.amp.GradScaler("cuda", enabled=(self.device == "cuda"))
-
+        
+        # 1. Pastikan device_type string untuk GradScaler
+        device_type = "cuda" if "cuda" in self.device else "cpu"
+        scaler = torch.amp.GradScaler(device_type, enabled=(device_type == "cuda"))
+        
         global_step = 0
-        best_loss   = float("inf")
+        best_loss = float("inf")
 
-        # Resume dari checkpoint kalau ada
         if resume:
             global_step, best_loss = self.ckpt_manager.load(
                 self.model, self.optimizer, self.scheduler
@@ -92,61 +90,63 @@ class Trainer:
 
         self.model.train()
         max_steps = self.config["max_steps"]
-
         print(f"\n🚀 Training starts | max_steps={max_steps:,}")
         print(f"   batch_size={self.config['batch_size']} | "
               f"grad_accum={self.accum_steps} | "
               f"effective_batch={self.config['batch_size'] * self.accum_steps}\n")
 
-        # ── Training Loop ──────────────────────────────────────
         self.optimizer.zero_grad()
         epoch = 0
-
+        
         while global_step < max_steps:
             epoch += 1
-
             for batch_idx, (x, y) in enumerate(dataloader):
                 if global_step >= max_steps:
                     break
 
-                # Forward + backward
-                loss = self.train_step(x, y)
+                # Forward + Backward menggunakan AMP Scaler yang benar
+                x, y = x.to(self.device), y.to(self.device)
+                with torch.autocast(device_type=device_type, dtype=torch.float16, enabled=(device_type == "cuda")):
+                    _, loss = self.model(x, targets=y)
+                    loss = loss / self.accum_steps
+
+                # Skala loss untuk mencegah underflow gradien pada FP16
+                scaler.scale(loss).backward()
+                unscaled_loss = loss.item() * self.accum_steps
 
                 # Update weights setiap accum_steps
                 if (batch_idx + 1) % self.accum_steps == 0:
+                    # Unscale gradien sebelum clipping
+                    scaler.unscale_(self.optimizer)
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.grad_clip)
 
-                    # Gradient clipping — cegah exploding gradients
-                    torch.nn.utils.clip_grad_norm_(
-                        self.model.parameters(), self.grad_clip
-                    )
-
-                    # Optimizer step
-                    self.optimizer.step()
+                    # Optimizer step via Scaler
+                    scaler.step(self.optimizer)
+                    scaler.update()
                     self.optimizer.zero_grad()
 
                     # LR scheduler step
                     lr = self.scheduler.step()
 
-                    # Hitung throughput
+                    # Hitung throughput tokens
                     tokens_per_step = (
-                        self.config["batch_size"]
-                        * self.config["max_seq_len"]
-                        * self.accum_steps
+                        self.config["batch_size"] * self.config["max_seq_len"] * self.accum_steps
                     )
 
                     # Logging
-                    self.logger.log(global_step, loss, lr, tokens_per_step)
+                    self.logger.log(global_step, unscaled_loss, lr, tokens_per_step)
 
-                    # Checkpoint
+                    # 2. PERBAIKAN BUG: Simpan checkpoint & best model HANYA pada interval tertentu
                     save_every = self.config.get("save_every", 500)
                     if global_step > 0 and global_step % save_every == 0:
                         self.ckpt_manager.save(
                             self.model, self.optimizer, self.scheduler,
-                            step=global_step, loss=loss,
-                            config=self.config,
+                            step=global_step, loss=unscaled_loss, config=self.config,
                         )
-                        if loss < best_loss:
-                            best_loss = loss
+                        
+                        # Cek dan simpan model terbaik di interval ini saja untuk menghemat I/O disk
+                        if unscaled_loss < best_loss:
+                            best_loss = unscaled_loss
                             self._save_best()
 
                     global_step += 1
@@ -155,7 +155,7 @@ class Trainer:
         # Final save
         self.ckpt_manager.save(
             self.model, self.optimizer, self.scheduler,
-            step=global_step, loss=loss, config=self.config,
+            step=global_step, loss=unscaled_loss, config=self.config,
         )
 
     def _save_best(self):
