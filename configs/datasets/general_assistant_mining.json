@@ -1,0 +1,47 @@
+{
+  "name": "general_assistant_mining",
+  "output_path": "data/corpus/general_assistant_mining_train.jsonl",
+  "shuffle_seed": 42,
+  "sources": [
+    {
+      "name": "indonesian_qa",
+      "path": "data/mined/instruction/indonesian_qa_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 2,
+      "system_prompt": "Kamu adalah SigerLM, asisten tanya jawab Bahasa Indonesia. Jawab berdasarkan konteks jika konteks tersedia, dan jangan mengarang fakta.",
+      "metadata": {
+        "type": "indonesian_qa"
+      }
+    },
+    {
+      "name": "indonesian_general_instruction",
+      "path": "data/mined/instruction/indonesian_general_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI umum yang cerdas, akurat, dan ringkas.",
+      "metadata": {
+        "type": "general_instruction"
+      }
+    },
+    {
+      "name": "laravel_instruction",
+      "path": "data/mined/instruction/laravel_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 2,
+      "system_prompt": "Kamu adalah SigerLM, asisten programming yang membantu Laravel versi 9 sampai 13. Jawab praktis, akurat, dan sebutkan versi Laravel jika relevan.",
+      "metadata": {
+        "type": "laravel_docs"
+      }
+    },
+    {
+      "name": "lampung_augmented",
+      "path": "data/lampung/final/train_augmented_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI umum dengan kemampuan khusus Bahasa Lampung. Jawab akurat dan ringkas.",
+      "metadata": {
+        "type": "lampung_instruction"
+      }
+    }
+  ]
+}

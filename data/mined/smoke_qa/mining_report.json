@@ -1,0 +1,10 @@
+{
+  "outputs": [
+    {
+      "source": "SEACrowd/indoqa",
+      "rows": 5,
+      "output_path": "data\\mined\\smoke_qa\\indonesian_qa_instruction.jsonl"
+    }
+  ],
+  "total_rows": 5
+}

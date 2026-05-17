@@ -69,6 +69,61 @@ def print_response(label: str, response: LampungResponse) -> None:
     print(f"Source: {response.source}")
 
 
+def print_help() -> None:
+    print("Ketik pertanyaan langsung untuk general assistant / auto router.")
+    print("Command opsional:")
+    print("  /help      tampilkan bantuan")
+    print("  /exit      keluar")
+    print("  /memory    lihat memory chat")
+    print("  /lo-id     Lampung O -> Indonesia")
+    print("  /id-lo     Indonesia -> Lampung O")
+    print("  /lo-en     Lampung O -> English")
+    print("  /reason    reasoning Lampung O -> Indonesia")
+    print("  /reorder   susun kata Lampung O")
+    print("Mode angka lama juga masih bisa: 0 auto, 1 LO->ID, 2 ID->LO, 3 LO->EN, 4 reasoning, 5 chat, 6 susun kata.")
+
+
+def read_followup_input() -> str:
+    return input("Input: ").strip()
+
+
+def handle_manual_mode(
+    mode: str,
+    text: str,
+    *,
+    chat: ChatSession,
+    lampung: LampungPipeline,
+    router: SigerRouter,
+) -> None:
+    if mode in {"0", "auto"}:
+        response = router.route(text)
+        print(f"Assistant: {response.text!r}")
+        print(f"Route: {response.route}")
+        print(f"Source: {response.source}")
+    elif mode == "1":
+        print_response("Indonesia", lampung.translate("Lampung O", "Bahasa Indonesia", text))
+    elif mode == "2":
+        print_response("Lampung O", lampung.translate("Bahasa Indonesia", "Lampung O", text))
+    elif mode == "3":
+        print_response("English", lampung.translate("Lampung O", "English", text))
+    elif mode == "4":
+        print_response("Reasoning", lampung.reason_lo_to_id(text))
+    elif mode == "5":
+        reply = chat.chat(
+            text,
+            max_new_tokens=80,
+            temperature=0.3,
+            top_k=20,
+            top_p=0.8,
+        )
+        print(f"Chat: {reply!r}")
+        print(f"Memory: {chat.memory_stats()}")
+    elif mode == "6":
+        print_response("Susunan", lampung.reorder("Lampung O", text))
+    else:
+        print("Mode tidak dikenal.")
+
+
 def main() -> None:
     model, tok = load_model("checkpoints/lora/model_lampung_merged.pt")
     gen = Generator(model, tok, device="cpu")
@@ -77,55 +132,68 @@ def main() -> None:
     router = SigerRouter(chat, lampung)
 
     print("SIGER_LLM CLI")
-    print(
-        "Mode: 0=auto/general, 1=LO->ID, 2=ID->LO, 3=LO->EN, "
-        "4=reasoning, 5=chat, 6=susun kata, exit=keluar"
-    )
+    print("Langsung ketik pertanyaan. Router otomatis memilih general chat atau tool Lampung.")
+    print("Ketik /help untuk command opsional, /exit untuk keluar.")
 
     while True:
-        mode = input("\nMode: ").strip().lower()
-        if mode in {"exit", "quit"}:
+        text = input("\nYou: ").strip()
+        command = text.lower()
+
+        if command in {"exit", "quit", "/exit", "/quit"}:
             break
 
-        text = input("Input: ").strip()
         if not text:
             continue
 
-        if mode in {"0", "auto"}:
-            response = router.route(text)
-            print(f"Assistant: {response.text!r}")
-            print(f"Route: {response.route}")
-            print(f"Source: {response.source}")
+        if command in {"/help", "help", "?"}:
+            print_help()
             continue
-        elif mode == "1":
-            print_response("Indonesia", lampung.translate("Lampung O", "Bahasa Indonesia", text))
-            continue
-        elif mode == "2":
-            print_response("Lampung O", lampung.translate("Bahasa Indonesia", "Lampung O", text))
-            continue
-        elif mode == "3":
-            print_response("English", lampung.translate("Lampung O", "English", text))
-            continue
-        elif mode == "4":
-            print_response("Reasoning", lampung.reason_lo_to_id(text))
-            continue
-        elif mode == "5":
-            reply = chat.chat(
-                text,
-                max_new_tokens=80,
-                temperature=0.3,
-                top_k=20,
-                top_p=0.8,
-            )
-            print(f"Chat: {reply!r}")
+
+        if command == "/memory":
             print(f"Memory: {chat.memory_stats()}")
             continue
-        elif mode == "6":
-            print_response("Susunan", lampung.reorder("Lampung O", text))
+
+        slash_modes = {
+            "/auto": "0",
+            "/lo-id": "1",
+            "/id-lo": "2",
+            "/lo-en": "3",
+            "/reason": "4",
+            "/chat": "5",
+            "/reorder": "6",
+        }
+
+        if command in slash_modes:
+            followup = read_followup_input()
+            if followup:
+                handle_manual_mode(
+                    slash_modes[command],
+                    followup,
+                    chat=chat,
+                    lampung=lampung,
+                    router=router,
+                )
             continue
-        else:
-            print("Mode tidak dikenal.")
+
+        if command in {"0", "auto", "1", "2", "3", "4", "5", "6"}:
+            followup = read_followup_input()
+            if followup:
+                handle_manual_mode(
+                    command,
+                    followup,
+                    chat=chat,
+                    lampung=lampung,
+                    router=router,
+                )
             continue
+
+        response = router.route(text)
+        print(f"Assistant: {response.text!r}")
+        print(f"Route: {response.route}")
+        print(f"Source: {response.source}")
+
+        if response.route == "general_chat":
+            print(f"Memory: {chat.memory_stats()}")
 
 
 if __name__ == "__main__":

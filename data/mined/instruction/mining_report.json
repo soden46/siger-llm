@@ -1,0 +1,35 @@
+{
+  "outputs": [
+    {
+      "source": "SEACrowd/indoqa",
+      "rows": 200,
+      "output_path": "data\\mined\\instruction\\indonesian_qa_instruction.jsonl"
+    },
+    {
+      "source": "togethercomputer/MoAA-SFT",
+      "rows": 200,
+      "output_path": "data\\mined\\instruction\\indonesian_general_instruction.jsonl"
+    },
+    {
+      "source": "FreedomIntelligence/alpaca-gpt4-indonesian",
+      "rows": 200,
+      "output_path": "data\\mined\\instruction\\indonesian_general_instruction.jsonl"
+    },
+    {
+      "source": "FreedomIntelligence/evol-instruct-indonesian",
+      "rows": 200,
+      "output_path": "data\\mined\\instruction\\indonesian_general_instruction.jsonl"
+    },
+    {
+      "source": "laravel_docs",
+      "rows": 142,
+      "output_path": "data\\mined\\instruction\\laravel_instruction.jsonl"
+    },
+    {
+      "source": "santrikoding_laravel",
+      "rows": 38,
+      "output_path": "data\\mined\\instruction\\laravel_instruction.jsonl"
+    }
+  ],
+  "total_rows": 980
+}

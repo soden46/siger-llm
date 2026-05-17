@@ -78,32 +78,33 @@ lampung_to_en
 python chat_cli.py
 ```
 
-Modes:
+The CLI accepts direct questions by default. `SigerRouter` decides whether to use general chat or a Lampung domain tool.
 
 ```txt
-0 auto/general router
-1 Lampung O -> Indonesia
-2 Indonesia -> Lampung O
-3 Lampung O -> English
-4 Lampung reasoning
-5 general chat
-6 Lampung word order
-```
-
-Latest smoke:
-
-```txt
-Mode: 0
-Input: Nyak haga mengan manuk di warung paghek jalan
+You: Nyak haga mengan manuk di warung paghek jalan
 Assistant: aku mau makan ayam di warung dekat jalan
 Route: lampung_to_id
 Source: exact instruction lookup
 ```
 
+Optional commands are still available for manual testing:
+
+```txt
+/help      show commands
+/lo-id     Lampung O -> Indonesia
+/id-lo     Indonesia -> Lampung O
+/lo-en     Lampung O -> English
+/reason    Lampung reasoning
+/chat      force general chat
+/reorder   Lampung word order
+```
+
+Legacy numeric modes are also supported: `0` auto, `1` LO->ID, `2` ID->LO, `3` LO->EN, `4` reasoning, `5` chat, `6` word order.
+
 Lampung O -> English:
 
 ```txt
-Mode: 3
+/lo-en
 Input: Nyak haga mengan manuk di warung paghek jalan
 English: i want to eat chicken at the stall near the road
 Source: exact instruction lookup
@@ -135,7 +136,6 @@ These defaults are conservative because current checkpoints are still small.
 python -m py_compile chat_cli.py inference\router.py inference\lampung_pipeline.py retrieval\instruction_lookup.py retrieval\compositional_translator.py
 
 @'
-0
 Nyak haga mengan manuk di warung paghek jalan
 exit
 '@ | python chat_cli.py
