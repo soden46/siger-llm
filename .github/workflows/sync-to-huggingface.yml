@@ -1,0 +1,19 @@
+name: Sync to Hugging Face Hub
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  sync-to-hub:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync GitHub repo to Hugging Face
+        uses: huggingface/hub-sync@v1
+        with:
+          github_repo_id: soden46/siger-llm
+          huggingface_repo_id: Syarifsoden/SigerLLM
+          repo_type: model
+          hf_token: ${{ secrets.HF_TOKEN }}
