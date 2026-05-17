@@ -24,6 +24,22 @@ SigerLM is an experimental general-purpose LM framework built around a custom SS
 4. Update docs when commands, architecture, or behavior changes.
 5. Mention dataset sources and license/usage notes.
 
+## Contribution Workflow
+
+1. Fork this repository.
+2. Create a new branch from `main`.
+3. Make focused changes.
+4. Run the relevant smoke checks.
+5. Commit using a clear commit message.
+6. Open a Pull Request and describe:
+   - what changed
+   - why it changed
+   - how it was tested
+
+## Discuss Larger Changes First
+
+For larger changes such as architecture redesigns, dataset schema changes, training pipeline changes, or new model features, please open an Issue first so the direction can be discussed before implementation.
+
 ## Setup
 
 ```powershell
@@ -76,6 +92,19 @@ python lora\run_lora.py --config configs\training\lampung_lora.json
 python tools\build_instruction_corpus.py --registry configs\datasets\general_instruction.json
 python lora\run_lora.py --config configs\training\general_lora.json
 ```
+
+Note: LoRA training expects an available base checkpoint, such as `./checkpoints/best_model.pt`.
+If you are working on training from scratch or base-model recipes, please open an Issue or check the current roadmap.
+
+## Pull Request Checklist
+
+Before submitting a PR, please confirm:
+
+- [ ] The change is scoped and focused.
+- [ ] Relevant smoke checks were run.
+- [ ] Documentation was updated if needed.
+- [ ] Dataset sources and license notes are included when applicable.
+- [ ] No checkpoints, secrets, or large raw datasets were committed.
 
 ## Commit Style
 

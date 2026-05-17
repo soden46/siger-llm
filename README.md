@@ -20,6 +20,35 @@ Experimental. The architecture, datasets, and training recipes are still changin
 - PDF extraction tools for Lampung sources
 - Evaluation and optimization scaffolding
 
+## Documentation Map
+
+Start here if you are navigating the repo:
+
+| File | Purpose |
+|---|---|
+| [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) | Short project context for contributors and AI assistants |
+| [AGENTS.md](AGENTS.md) | Rules and workflow notes for coding agents |
+| [CLAUDE.md](CLAUDE.md) | Compact assistant-facing project guide |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution workflow, dataset format, and commit style |
+| [SECURITY.md](SECURITY.md) | Security policy and private reporting instructions |
+| [docs/INSTALLATION.md](docs/INSTALLATION.md) | Setup, install, and smoke checks |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System layers and module boundaries |
+| [docs/TRAINING.md](docs/TRAINING.md) | Base training, corpus builder, and LoRA training flow |
+| [docs/LORA.md](docs/LORA.md) | LoRA config, dataset formatting, and merge workflow |
+| [docs/INFERENCE.md](docs/INFERENCE.md) | Generator, chat, Lampung pipeline, and router CLI |
+| [docs/EVALUATION.md](docs/EVALUATION.md) | Current evaluation scope and smoke results |
+| [docs/OPTIMIZATION.md](docs/OPTIMIZATION.md) | CPU/VPS, ONNX, quantization, and benchmark notes |
+
+Suggested reading order:
+
+```txt
+README.md
+  -> PROJECT_CONTEXT.md
+  -> docs/INSTALLATION.md
+  -> docs/ARCHITECTURE.md
+  -> docs/TRAINING.md or docs/INFERENCE.md
+```
+
 ## Architecture
 
 ```txt
