@@ -17,6 +17,7 @@ class HardwareProfile:
     ram_gb: float
     gpu_name: str | None = None
     gpu_memory_gb: float | None = None
+    gpu_count: int = 0
 
     @property
     def is_low_ram(self) -> bool:
@@ -36,6 +37,7 @@ def detect_hardware(prefer_gpu: bool = True) -> HardwareProfile:
             ram_gb=ram_gb,
             gpu_name=props.name,
             gpu_memory_gb=props.total_memory / 1e9,
+            gpu_count=torch.cuda.device_count(),
         )
 
     return HardwareProfile(device="cpu", cpu_cores=cpu_cores, ram_gb=ram_gb)
@@ -48,5 +50,5 @@ def print_hardware_profile(profile: HardwareProfile) -> None:
     print(f"  ram       : {profile.ram_gb:.1f} GB")
     if profile.gpu_name:
         print(f"  gpu       : {profile.gpu_name}")
+        print(f"  gpu count : {profile.gpu_count}")
         print(f"  gpu memory: {profile.gpu_memory_gb:.1f} GB")
-

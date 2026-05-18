@@ -13,6 +13,63 @@ print_hardware_profile(hardware)
 
 `lora/run_lora.py` uses this to choose GPU when available and reduce CPU thread usage on low-RAM machines.
 
+## Runtime Hardware Planner
+
+Training uses `optimization/gpu.py` to choose a runtime strategy dynamically:
+
+```txt
+cpu            CPU-only fallback
+single_gpu     one CUDA GPU
+data_parallel  single-process multi-GPU notebook/runtime
+ddp            torchrun/DDP when WORLD_SIZE and LOCAL_RANK are present
+```
+
+The planner enables TF32 CUDA defaults, chooses conservative dataloader workers, uses pinned memory on CUDA, and unwraps `DataParallel` / `DistributedDataParallel` before saving checkpoints.
+
+For Kaggle T4x2, the expected strategy is `data_parallel`. For cluster experiments launched with `torchrun`, the expected strategy is `ddp`.
+
+Base training can opt into conservative batch scaling:
+
+```json
+{
+  "auto_scale_batch": true,
+  "max_auto_scale_factor": 2,
+  "max_global_batch_size": 512
+}
+```
+
+This uses more available GPU capacity without allowing batch size to grow unbounded on larger machines.
+
+Experimental cluster-scaling features now available:
+
+- FSDP wrapping can be requested with `distributed_strategy="fsdp"` or `SIGER_DISTRIBUTED_STRATEGY=fsdp` under `torchrun`.
+- Sharded checkpoint directories can be enabled with `sharded_checkpoint=true`.
+- Graceful preemption handling can stop after the current optimizer step and still write final checkpoints.
+- Gradient checkpointing can be enabled through `SigerConfig(gradient_checkpointing=True)`.
+- Distributed validation aggregation is available through `optimization.distributed_validation.evaluate_lm_loss`.
+- Conservative VRAM-aware batch suggestion is available through `auto_tune_batch_vram=true`.
+
+These features are intentionally opt-in. The current state is best described as a **cluster-ready experimental stack**, not yet a fully managed production cluster platform.
+
+Example FSDP launch:
+
+```bash
+SIGER_DISTRIBUTED_STRATEGY=fsdp torchrun --standalone --nproc_per_node=2 main.py
+```
+
+Example config switches:
+
+```json
+{
+  "distributed_strategy": "fsdp",
+  "gradient_checkpointing": true,
+  "sharded_checkpoint": true,
+  "elastic_recovery": true,
+  "auto_tune_batch_vram": true,
+  "vram_safety_fraction": 0.7
+}
+```
+
 ## CPU Constraints
 
 Target baseline:

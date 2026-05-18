@@ -30,8 +30,20 @@ TRAIN_CONFIG = {
     # Training kecil
     "max_steps": 1500,
     "batch_size": 256,
+    "auto_scale_batch": True,
+    "max_auto_scale_factor": 2,
+    "max_global_batch_size": 512,
     "max_seq_len": 32 ,
     "grad_accum_steps": 1,
+    "device": "auto",
+    "prefer_gpu": True,
+    "multi_gpu": True,
+    "distributed_strategy": "auto",
+    "gradient_checkpointing": True,
+    "sharded_checkpoint": False,
+    "elastic_recovery": True,
+    "auto_tune_batch_vram": False,
+    "vram_safety_fraction": 0.70,
 
     # Optimizer
     # "max_lr":        3e-4,
@@ -95,6 +107,7 @@ def main():
         d_model=TRAIN_CONFIG["d_model"],
         n_layers=TRAIN_CONFIG["n_layers"],
         max_seq_len=TRAIN_CONFIG["max_seq_len"],
+        gradient_checkpointing=TRAIN_CONFIG.get("gradient_checkpointing", False),
     )
     
     model = SigerLM(model_config)

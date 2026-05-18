@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 from datetime import datetime
 
+from optimization.gpu import unwrap_model
+
 
 class CheckpointManager:
     """
@@ -30,10 +32,15 @@ class CheckpointManager:
         ckpt_name = f"step_{step:07d}_{timestamp}.pt"
         ckpt_path = self.save_dir / ckpt_name
 
+        raw_model = unwrap_model(model)
+
+        model_name = getattr(getattr(raw_model, "config", None), "model_name", "SIGER")
+
         torch.save({
             "step":            step,
             "loss":            loss,
-            "model_state":     model.state_dict(),
+            "model_name":      model_name,
+            "model_state":     raw_model.state_dict(),
             "optimizer_state": optimizer.state_dict(),
             "scheduler_step":  scheduler.current_step,
             "config":          config,
@@ -42,7 +49,7 @@ class CheckpointManager:
         # Simpan metadata
         meta_path = self.save_dir / "latest.json"
         with open(meta_path, "w") as f:
-            json.dump({"latest": ckpt_name, "step": step, "loss": loss}, f)
+            json.dump({"latest": ckpt_name, "step": step, "loss": loss, "model_name": model_name}, f)
 
         self.history.append(str(ckpt_path))
         print(f"💾 Saved checkpoint: {ckpt_name} | loss={loss:.4f}")
@@ -64,7 +71,7 @@ class CheckpointManager:
             path = self.save_dir / meta["latest"]
 
         ckpt = torch.load(path, map_location="cpu")
-        model.load_state_dict(ckpt["model_state"])
+        unwrap_model(model).load_state_dict(ckpt["model_state"])
 
         if optimizer and "optimizer_state" in ckpt:
             optimizer.load_state_dict(ckpt["optimizer_state"])

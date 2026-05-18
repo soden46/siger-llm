@@ -2,6 +2,7 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
 from typing import Optional
 
 from .optimizer   import build_optimizer, CosineScheduler
@@ -9,20 +10,69 @@ from .checkpoint  import CheckpointManager
 from .logger      import TrainingLogger
 from .dataset     import TextDataset
 from tokenizer.tokenizer import MultilingualTokenizer
+from optimization.gpu import (
+    barrier,
+    build_runtime_plan,
+    cleanup_distributed,
+    print_runtime_plan,
+    unwrap_model,
+    wrap_model_for_runtime,
+)
+from optimization.autotune import suggest_cuda_batch_size
+from optimization.elastic import install_signal_handlers
+from optimization.sharded_checkpoint import save_sharded_checkpoint
 
 
 class Trainer:
     def __init__(self, model, config: dict, device: str = None):
         self.model  = model
         self.config = config
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.runtime = build_runtime_plan(
+            prefer_gpu=config.get("prefer_gpu", True),
+            requested_device=device or config.get("device", "auto"),
+            cpu_cores=config.get("cpu_cores", 1),
+            max_workers=config.get("max_dataloader_workers"),
+            strategy=config.get("distributed_strategy", "auto"),
+        )
+        self.device = self.runtime.device
 
         self.model.to(self.device)
-        print(f"🖥️  Device: {self.device}")
+        self.model = wrap_model_for_runtime(
+            self.model,
+            self.runtime,
+            enabled=config.get("multi_gpu", True),
+        )
+        if self.runtime.is_main_process:
+            print(f"🖥️  Device: {self.device}")
+            print_runtime_plan(self.runtime)
+
+        if config.get("auto_scale_batch", False) and self.runtime.device_count > 1:
+            base_batch = int(config["batch_size"])
+            factor = min(self.runtime.device_count, int(config.get("max_auto_scale_factor", 2)))
+            max_batch = int(config.get("max_global_batch_size", base_batch))
+            scaled_batch = min(base_batch * factor, max_batch)
+            if scaled_batch > base_batch:
+                config["batch_size"] = scaled_batch
+                if self.runtime.is_main_process:
+                    print(f"Auto-scaled global batch_size: {base_batch} -> {scaled_batch}")
+
+        if config.get("auto_tune_batch_vram", False):
+            base_batch = int(config["batch_size"])
+            tuned_batch = suggest_cuda_batch_size(
+                base_batch_size=base_batch,
+                max_batch_size=int(config.get("max_global_batch_size", base_batch)),
+                max_seq_len=int(config["max_seq_len"]),
+                d_model=int(config.get("d_model", 256)),
+                safety_fraction=float(config.get("vram_safety_fraction", 0.70)),
+            )
+            if tuned_batch > base_batch:
+                config["batch_size"] = tuned_batch
+                if self.runtime.is_main_process:
+                    print(f"VRAM-tuned global batch_size: {base_batch} -> {tuned_batch}")
 
         # Komponen training
         self.optimizer = build_optimizer(
-            model,
+            self.model,
             lr=config["max_lr"],
             weight_decay=config.get("weight_decay", 0.1)
         )
@@ -45,12 +95,14 @@ class Trainer:
         self.accum_steps = config.get("grad_accum_steps", 1)  # gradient accumulation
 
     def _build_dataloader(self, dataset: TextDataset) -> DataLoader:
+        sampler = DistributedSampler(dataset, shuffle=True) if self.runtime.is_distributed else None
         return DataLoader(
             dataset,
             batch_size=self.config["batch_size"],
-            shuffle=True,
-            num_workers=self.config.get("num_workers", 2),
-            pin_memory=(self.device == "cuda"),
+            shuffle=(sampler is None),
+            sampler=sampler,
+            num_workers=self.config.get("num_workers", self.runtime.dataloader_workers),
+            pin_memory=self.runtime.pin_memory,
             drop_last=True,
         )
 
@@ -63,6 +115,8 @@ class Trainer:
         with torch.autocast(device_type=self.device, dtype=torch.float16,
                             enabled=(self.device == "cuda")):
             _, loss = self.model(x, targets=y)
+            if loss.dim() > 0:
+                loss = loss.mean()
             loss = loss / self.accum_steps  # scale buat grad accum
 
         loss.backward()
@@ -74,6 +128,7 @@ class Trainer:
         resume: bool = True,
     ):
         """Main training loop."""
+        elastic_state = install_signal_handlers() if self.config.get("elastic_recovery", True) else None
         dataloader = self._build_dataloader(dataset)
         
         # 1. Pastikan device_type string untuk GradScaler
@@ -100,14 +155,18 @@ class Trainer:
         
         while global_step < max_steps:
             epoch += 1
+            if self.runtime.is_distributed and hasattr(dataloader.sampler, "set_epoch"):
+                dataloader.sampler.set_epoch(epoch)
             for batch_idx, (x, y) in enumerate(dataloader):
-                if global_step >= max_steps:
+                if global_step >= max_steps or (elastic_state and elastic_state.should_stop):
                     break
 
                 # Forward + Backward menggunakan AMP Scaler yang benar
                 x, y = x.to(self.device), y.to(self.device)
                 with torch.autocast(device_type=device_type, dtype=torch.float16, enabled=(device_type == "cuda")):
                     _, loss = self.model(x, targets=y)
+                    if loss.dim() > 0:
+                        loss = loss.mean()
                     loss = loss / self.accum_steps
 
                 # Skala loss untuk mencegah underflow gradien pada FP16
@@ -134,15 +193,26 @@ class Trainer:
                     )
 
                     # Logging
-                    self.logger.log(global_step, unscaled_loss, lr, tokens_per_step)
+                    if self.runtime.is_main_process:
+                        self.logger.log(global_step, unscaled_loss, lr, tokens_per_step)
 
                     # 2. PERBAIKAN BUG: Simpan checkpoint & best model HANYA pada interval tertentu
                     save_every = self.config.get("save_every", 500)
-                    if global_step > 0 and global_step % save_every == 0:
+                    if self.runtime.is_main_process and global_step > 0 and global_step % save_every == 0:
                         self.ckpt_manager.save(
                             self.model, self.optimizer, self.scheduler,
                             step=global_step, loss=unscaled_loss, config=self.config,
                         )
+                        if self.config.get("sharded_checkpoint", False):
+                            save_sharded_checkpoint(
+                                model=self.model,
+                                optimizer=self.optimizer,
+                                scheduler=self.scheduler,
+                                output_dir=self.ckpt_manager.save_dir / f"sharded_step_{global_step:07d}",
+                                step=global_step,
+                                loss=unscaled_loss,
+                                config=self.config,
+                            )
                         
                         # Cek dan simpan model terbaik di interval ini saja untuk menghemat I/O disk
                         if unscaled_loss < best_loss:
@@ -151,14 +221,35 @@ class Trainer:
 
                     global_step += 1
 
-        self.logger.summary(global_step)
-        # Final save
-        self.ckpt_manager.save(
-            self.model, self.optimizer, self.scheduler,
-            step=global_step, loss=unscaled_loss, config=self.config,
-        )
-        if unscaled_loss < best_loss or not self._best_path().exists():
-            self._save_best()
+            if elastic_state and elastic_state.should_stop:
+                break
+
+        if self.runtime.is_distributed:
+            barrier()
+
+        if self.runtime.is_main_process:
+            self.logger.summary(global_step)
+            # Final save
+            self.ckpt_manager.save(
+                self.model, self.optimizer, self.scheduler,
+                step=global_step, loss=unscaled_loss, config=self.config,
+            )
+            if self.config.get("sharded_checkpoint", False):
+                save_sharded_checkpoint(
+                    model=self.model,
+                    optimizer=self.optimizer,
+                    scheduler=self.scheduler,
+                    output_dir=self.ckpt_manager.save_dir / "sharded_final",
+                    step=global_step,
+                    loss=unscaled_loss,
+                    config=self.config,
+                )
+            if unscaled_loss < best_loss or not self._best_path().exists():
+                self._save_best()
+
+        if self.runtime.is_distributed:
+            barrier()
+            cleanup_distributed()
 
     def _best_path(self):
         return self.ckpt_manager.save_dir / "best_model.pt"
@@ -166,5 +257,5 @@ class Trainer:
     def _save_best(self):
         """Simpan model terbaik terpisah."""
         best_path = self._best_path()
-        torch.save(self.model.state_dict(), best_path)
+        torch.save(unwrap_model(self.model).state_dict(), best_path)
         print(f"🏆 Best model saved!")

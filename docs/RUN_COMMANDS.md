@@ -52,6 +52,18 @@ python -c "import torch; from config.model_config import SigerConfig; from model
 python main.py
 ```
 
+Jika runtime punya lebih dari satu GPU CUDA, trainer otomatis memakai `torch.nn.DataParallel`.
+Log yang diharapkan:
+
+```txt
+Runtime plan
+  strategy  : data_parallel
+  devices   : 2
+Using DataParallel on 2 GPUs: Tesla T4, Tesla T4
+```
+
+`main.py` juga mengaktifkan `auto_scale_batch` secara konservatif: batch global 256 bisa naik sampai 512 saat ada 2+ GPU, tetapi tidak akan naik tanpa batas di cluster besar.
+
 ## 5. Build Dataset Lampung
 
 ```powershell
@@ -167,6 +179,17 @@ Indonesian HF mix LoRA:
 ```powershell
 python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix.json
 python lora\run_lora.py --config configs\training\indonesian_hf_mix_lora.json
+```
+
+Config Indonesian HF mix memakai `batch_size=2` supaya DataParallel bisa membagi batch ke dua GPU. Ini tetap konservatif untuk T4x2 karena effective batch masih `2 x 4 accum = 8`.
+
+Untuk cluster atau multi-process launch, runtime planner juga membaca environment `WORLD_SIZE`, `RANK`, dan `LOCAL_RANK`. Jalur ini dipakai jika training diluncurkan dengan `torchrun`.
+
+Contoh single-node DDP:
+
+```bash
+torchrun --standalone --nproc_per_node=2 main.py
+torchrun --standalone --nproc_per_node=2 lora/run_lora.py --config configs/training/indonesian_hf_mix_lora.json
 ```
 
 Default backward-compatible Lampung run:

@@ -29,6 +29,9 @@ class LoRAConfig:
     weight_decay: float = 0.01
     device: str = "auto"  # "auto", "cpu", or "cuda"
     prefer_gpu: bool = True
+    distributed_strategy: str = "auto"
+    sharded_checkpoint: bool = False
+    elastic_recovery: bool = True
 
     # ── Dataset Lokal Lampung ─────────────────────────────
     dataset_path: str = "data/lampung/final/train_instruction.jsonl"

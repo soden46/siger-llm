@@ -15,6 +15,7 @@ from lora.model import LoRAModel
 from lora.trainer import LoRATrainer
 from model.siger_model import SigerLM
 from optimization.cpu.threading import configure_cpu
+from optimization.gpu import barrier, cleanup_distributed, is_main_process
 from optimization.hardware import detect_hardware, print_hardware_profile
 from tokenizer.hybrid_tokenizer import build_tokenizer
 
@@ -198,12 +199,17 @@ def main() -> None:
     )
     trainer.train(dataset)
 
-    print("\nMerging LoRA into base model...")
-    lora_model.merge_and_export(lora_config.merged_output)
+    barrier()
+    if is_main_process():
+        print("\nMerging LoRA into base model...")
+        lora_model.merge_and_export(lora_config.merged_output)
 
-    print("Done.")
-    print(f"   LoRA adapters saved in : {lora_config.save_dir}")
-    print(f"   Merged model saved at  : {lora_config.merged_output}")
+        print("Done.")
+        print(f"   LoRA adapters saved in : {lora_config.save_dir}")
+        print(f"   Merged model saved at  : {lora_config.merged_output}")
+
+    barrier()
+    cleanup_distributed()
 
 
 if __name__ == "__main__":

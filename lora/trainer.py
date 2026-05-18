@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import time
 from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
 from functools import partial
 from pathlib import Path
 
@@ -11,6 +12,15 @@ from .model   import LoRAModel
 from .dataset import InstructionDataset, collate_fn
 from training.optimizer import CosineScheduler
 from training.logger    import TrainingLogger
+from optimization.gpu import (
+    barrier,
+    build_runtime_plan,
+    print_runtime_plan,
+    unwrap_model,
+    wrap_model_for_runtime,
+)
+from optimization.elastic import install_signal_handlers
+from optimization.sharded_checkpoint import save_sharded_checkpoint
 from optimization.hardware import detect_hardware, print_hardware_profile
 
 
@@ -27,10 +37,22 @@ class LoRATrainer:
         if config.device == "auto":
             hardware = detect_hardware(prefer_gpu=config.prefer_gpu)
             print_hardware_profile(hardware)
-            self.device = hardware.device
         else:
-            self.device = config.device
+            hardware = detect_hardware(prefer_gpu=(config.device == "cuda"))
+        self.runtime = build_runtime_plan(
+            prefer_gpu=config.prefer_gpu,
+            requested_device=config.device,
+            cpu_cores=hardware.cpu_cores,
+            strategy=config.distributed_strategy,
+        )
+        self.device = self.runtime.device
         self.model.to(self.device)
+        self.model = wrap_model_for_runtime(
+            self.model,
+            self.runtime,
+            enabled=True,
+        )
+        print_runtime_plan(self.runtime)
 
         # Hanya optimize LoRA params
         lora_params = [
@@ -54,13 +76,16 @@ class LoRATrainer:
         Path(config.save_dir).mkdir(parents=True, exist_ok=True)
 
     def train(self, dataset: InstructionDataset):
+        elastic_state = install_signal_handlers() if self.config.elastic_recovery else None
+        sampler = DistributedSampler(dataset, shuffle=True) if self.runtime.is_distributed else None
         loader = DataLoader(
             dataset,
             batch_size=self.config.batch_size,
-            shuffle=True,
+            shuffle=(sampler is None),
+            sampler=sampler,
             collate_fn=partial(collate_fn, pad_id=self.tokenizer.pad_id),
-            num_workers=1,
-            pin_memory=(self.device == "cuda"),
+            num_workers=self.runtime.dataloader_workers,
+            pin_memory=self.runtime.pin_memory,
         )
 
         print(f"\n🚀 LoRA Training")
@@ -76,8 +101,10 @@ class LoRATrainer:
         self.optimizer.zero_grad()
 
         while step < self.config.max_steps:
+            if self.runtime.is_distributed and hasattr(loader.sampler, "set_epoch"):
+                loader.sampler.set_epoch(step)
             for batch in loader:
-                if step >= self.config.max_steps:
+                if step >= self.config.max_steps or (elastic_state and elastic_state.should_stop):
                     break
 
                 input_ids = batch["input_ids"].to(self.device)
@@ -117,23 +144,50 @@ class LoRATrainer:
                     last_step_time = now
                     tokens_since_step = 0
 
-                    self.logger.log(
-                        step,
-                        loss.item() * self.config.grad_accum,
-                        lr,
-                        tokens_per_sec=tokens_per_sec,
-                    )
+                    if self.runtime.is_main_process:
+                        self.logger.log(
+                            step,
+                            loss.item() * self.config.grad_accum,
+                            lr,
+                            tokens_per_sec=tokens_per_sec,
+                        )
 
-                    if step > 0 and step % self.config.save_every == 0:
+                    if self.runtime.is_main_process and step > 0 and step % self.config.save_every == 0:
                         self._save(step, loss.item())
+                        if self.config.sharded_checkpoint:
+                            save_sharded_checkpoint(
+                                model=self.model,
+                                optimizer=self.optimizer,
+                                scheduler=self.scheduler,
+                                output_dir=Path(self.config.save_dir) / f"sharded_step_{step:06d}",
+                                step=step,
+                                loss=loss.item(),
+                                config=self.config.__dict__,
+                            )
 
                 step += 1
 
+            if elastic_state and elastic_state.should_stop:
+                break
+
         # Final save
-        self._save(step, loss.item())
+        if self.runtime.is_distributed:
+            barrier()
+        if self.runtime.is_main_process:
+            self._save(step, loss.item())
+            if self.config.sharded_checkpoint:
+                save_sharded_checkpoint(
+                    model=self.model,
+                    optimizer=self.optimizer,
+                    scheduler=self.scheduler,
+                    output_dir=Path(self.config.save_dir) / "sharded_final",
+                    step=step,
+                    loss=loss.item(),
+                    config=self.config.__dict__,
+                )
         print("\n✅ LoRA training complete!")
 
     def _save(self, step: int, loss: float):
         path = f"{self.config.save_dir}/lora_step_{step:06d}.pt"
-        self.model.save_lora(path)
+        unwrap_model(self.model).save_lora(path)
         print(f"💾 Saved: {path} | loss={loss:.4f}")

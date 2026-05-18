@@ -256,6 +256,15 @@ Special token IDs tidak boleh diubah sembarangan karena berpengaruh ke checkpoin
 
 ## 7. Model Core: SigerLM
 
+Public model identity is anchored to the immutable base name `SIGER`.
+If an alias is provided through `SigerConfig(model_alias="soden")`, the canonical public name becomes:
+
+```txt
+SIGER-SODEN
+```
+
+Aliases cannot replace the base name; they are appended after `SIGER`.
+
 End-to-end forward pass:
 
 ```txt

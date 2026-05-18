@@ -16,6 +16,25 @@ single CPU / single GPU
 
 This roadmap should be implemented gradually. SigerLM does **not** need to adopt every distributed technique immediately. The first goal is to make the training architecture **distributed-ready without breaking the current local workflow**.
 
+Current implementation status: SigerLM has a cluster-ready experimental stack for CPU, single GPU, single-node multi-GPU, and `torchrun`/DDP-style launch detection. It is not yet a fully managed production cluster platform.
+
+Experimental features now present:
+
+- FSDP opt-in runtime wrapping.
+- Sharded checkpoint utility.
+- Graceful preemption handling for safer recovery.
+- Activation/gradient checkpointing in the SigerLM block stack.
+- Distributed validation loss aggregation helper.
+- Conservative VRAM-aware batch-size suggestion.
+
+Remaining gaps:
+
+- No elastic multi-node job requeue orchestration yet.
+- No automatic recovery from arbitrary node failure mid-step.
+- No full validation dataset wiring in the default base trainer yet.
+- No aggressive OOM-search batch tuner; current VRAM tuning is conservative.
+- No production-grade sharded checkpoint consolidation policy yet.
+
 ---
 
 # Why This Roadmap Exists

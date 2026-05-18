@@ -2,6 +2,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.checkpoint import checkpoint
 
 from model.ssm_block import SSMBlock
 
@@ -11,6 +12,7 @@ class SigerLM(nn.Module):
         super().__init__()
 
         self.config = config
+        self.model_name = getattr(config, "model_name", "SIGER")
 
         # Token embedding: token_id → hidden representation
         self.embedding = nn.Embedding(
@@ -72,7 +74,10 @@ class SigerLM(nn.Module):
 
         # Lewat semua SSM blocks
         for layer in self.layers:
-            x = layer(x)
+            if self.training and getattr(self.config, "gradient_checkpointing", False) and x.requires_grad:
+                x = checkpoint(layer, x, use_reentrant=False)
+            else:
+                x = layer(x)
 
         # Final normalization
         x = self.norm_f(x)

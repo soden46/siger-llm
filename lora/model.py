@@ -1,6 +1,8 @@
 # lora/model.py
 import torch
 import torch.nn as nn
+import json
+from pathlib import Path
 from typing import Dict, List
 from .layer  import LoRALinear
 from .config import LoRAConfig
@@ -142,5 +144,10 @@ class LoRAModel(nn.Module):
 
         _merge(merged_model, self.base_model)
         torch.save(merged_model.state_dict(), save_path)
+        model_name = getattr(getattr(merged_model, "config", None), "model_name", "SIGER")
+        Path(save_path).with_suffix(".json").write_text(
+            json.dumps({"model_name": model_name, "base_name": "SIGER"}, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
         print(f"✅ Merged model saved: {save_path}")
         return merged_model

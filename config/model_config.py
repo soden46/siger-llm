@@ -1,8 +1,10 @@
 # config/model_config.py
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 import json
 from pathlib import Path
+
+from .model_identity import SIGER_BASE_NAME, canonical_model_name
 
 
 @dataclass
@@ -44,11 +46,20 @@ class SigerConfig:
     # ── Initialization ────────────────────────────────────
     initializer_range: float = 0.02
     residual_in_fp32: bool   = True
+    gradient_checkpointing: bool = False
+    model_alias: str | None = None
+    model_base_name: str = field(init=False, default=SIGER_BASE_NAME)
 
     def __post_init__(self):
         if self.dt_rank == "auto":
             d_inner = self.d_model * self.expand
             self.dt_rank = max(1, d_inner // 16)
+        self.model_base_name = SIGER_BASE_NAME
+        self.model_alias = canonical_model_name(self.model_alias)
+
+    @property
+    def model_name(self) -> str:
+        return canonical_model_name(self.model_alias)
 
     @property
     def d_inner(self) -> int:
@@ -85,6 +96,7 @@ class SigerConfig:
     def from_json(cls, path: str) -> "SigerConfig":
         with open(path) as f:
             data = json.load(f)
+        data.pop("model_base_name", None)
         return cls(**data)
 
     @classmethod
