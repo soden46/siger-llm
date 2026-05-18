@@ -221,6 +221,23 @@ python lora\run_lora.py
 
 ## 10. CLI Inference Test
 
+One-shot Kaggle-friendly test:
+
+```powershell
+python chat_cli.py --checkpoint checkpoints\lora\model_indonesian_hf_mix_plus_kaggle_merged.pt --prompt "Apa itu bahasa Lampung?"
+python chat_cli.py --checkpoint checkpoints\lora\model_indonesian_hf_mix_plus_kaggle_merged.pt --mode lo-id --prompt "Nyak haga mengan manuk di warung paghek jalan"
+```
+
+Jika `--checkpoint` tidak diberikan, CLI akan mencoba checkpoint terbaru yang umum dipakai:
+
+```txt
+checkpoints/lora/model_indonesian_hf_mix_plus_kaggle_merged.pt
+checkpoints/lora/model_indonesian_hf_mix_merged.pt
+checkpoints/lora/model_general_merged.pt
+checkpoints/lora/model_lampung_merged.pt
+checkpoints/best_model.pt
+```
+
 Direct auto-router input:
 
 ```powershell

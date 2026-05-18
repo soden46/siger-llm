@@ -1,13 +1,26 @@
+import argparse
+import os
+from pathlib import Path
 import torch
 import re
 
 from config.model_config import SigerConfig
+from config.model_identity import canonical_model_name
 from inference.chat import ChatSession
 from inference.generator import Generator
 from inference.lampung_pipeline import LampungPipeline, LampungResponse
 from inference.router import SigerRouter
 from model.siger_model import SigerLM
 from tokenizer.hybrid_tokenizer import build_tokenizer
+
+
+DEFAULT_CHECKPOINT_CANDIDATES = [
+    "checkpoints/lora/model_indonesian_hf_mix_plus_kaggle_merged.pt",
+    "checkpoints/lora/model_indonesian_hf_mix_merged.pt",
+    "checkpoints/lora/model_general_merged.pt",
+    "checkpoints/lora/model_lampung_merged.pt",
+    "checkpoints/best_model.pt",
+]
 
 
 def infer_config_from_state_dict(state_dict: dict) -> SigerConfig:
@@ -41,13 +54,55 @@ def infer_config_from_state_dict(state_dict: dict) -> SigerConfig:
     )
 
 
-def load_model(checkpoint_path: str) -> tuple[SigerLM, object]:
+def resolve_checkpoint(path: str | None = None) -> Path:
+    env_path = os.environ.get("SIGER_CHECKPOINT")
+    if path:
+        candidate = Path(path)
+        if candidate.exists():
+            return candidate
+        raise FileNotFoundError(f"Checkpoint not found: {candidate}")
+
+    if env_path:
+        candidate = Path(env_path)
+        if candidate.exists():
+            return candidate
+        raise FileNotFoundError(f"SIGER_CHECKPOINT not found: {candidate}")
+
+    for candidate in DEFAULT_CHECKPOINT_CANDIDATES:
+        path_obj = Path(candidate)
+        if path_obj.exists():
+            return path_obj
+
+    step_candidates = sorted(Path("checkpoints").glob("step_*.pt"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if step_candidates:
+        return step_candidates[0]
+
+    lora_candidates = sorted(Path("checkpoints/lora").glob("*merged.pt"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if lora_candidates:
+        return lora_candidates[0]
+
+    raise FileNotFoundError(
+        "No checkpoint found. Use --checkpoint PATH or set SIGER_CHECKPOINT."
+    )
+
+
+def load_checkpoint_state(checkpoint_path: Path) -> tuple[dict, str]:
+    ckpt = torch.load(checkpoint_path, map_location="cpu")
+    model_name = "SIGER"
+    if isinstance(ckpt, dict):
+        model_name = str(ckpt.get("model_name") or model_name)
+        if "model_state" in ckpt:
+            return ckpt["model_state"], model_name
+    return ckpt, model_name
+
+
+def load_model(checkpoint_path: str | None = None) -> tuple[SigerLM, object, Path]:
+    resolved = resolve_checkpoint(checkpoint_path)
+    print(f"Checkpoint: {resolved}")
     tok = build_tokenizer("auto")
     print(f"Tokenizer backend: {tok.backend} | vocab_size={tok.vocab_size}")
 
-    ckpt = torch.load(checkpoint_path, map_location="cpu")
-    if "model_state" in ckpt:
-        ckpt = ckpt["model_state"]
+    ckpt, model_name = load_checkpoint_state(resolved)
 
     if "embedding.weight" in ckpt and ckpt["embedding.weight"].shape[0] != tok.vocab_size:
         raise RuntimeError(
@@ -57,11 +112,13 @@ def load_model(checkpoint_path: str) -> tuple[SigerLM, object]:
         )
 
     config = infer_config_from_state_dict(ckpt)
+    config.model_alias = canonical_model_name(model_name)
     model = SigerLM(config)
 
     missing, unexpected = model.load_state_dict(ckpt, strict=True)
     print(f"Loaded checkpoint | missing={len(missing)} unexpected={len(unexpected)}")
-    return model, tok
+    print(f"Model name: {model.model_name}")
+    return model, tok, resolved
 
 
 def print_response(label: str, response: LampungResponse) -> None:
@@ -124,14 +181,59 @@ def handle_manual_mode(
         print("Mode tidak dikenal.")
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="SIGER chat CLI and Kaggle smoke tester.")
+    parser.add_argument("--checkpoint", default=None, help="Checkpoint path. Defaults to latest known SIGER checkpoint.")
+    parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"], help="Inference device.")
+    parser.add_argument("--prompt", default=None, help="Run one prompt and exit.")
+    parser.add_argument("--mode", default="auto", help="auto/chat/lo-id/id-lo/lo-en/reason/reorder or legacy 0-6.")
+    parser.add_argument("--max-new-tokens", type=int, default=80)
+    parser.add_argument("--info", action="store_true", help="Print model info and exit.")
+    return parser.parse_args()
+
+
+def normalize_mode(mode: str) -> str:
+    return {
+        "auto": "0",
+        "lo-id": "1",
+        "id-lo": "2",
+        "lo-en": "3",
+        "reason": "4",
+        "chat": "5",
+        "reorder": "6",
+    }.get(mode.lower(), mode)
+
+
 def main() -> None:
-    model, tok = load_model("checkpoints/lora/model_lampung_merged.pt")
-    gen = Generator(model, tok, device="cpu")
+    args = parse_args()
+    model, tok, checkpoint = load_model(args.checkpoint)
+    device = "cuda" if args.device == "auto" and torch.cuda.is_available() else args.device
+    if device == "auto":
+        device = "cpu"
+    gen = Generator(model, tok, device=device)
     chat = ChatSession(gen, max_context_tokens=1024)
     lampung = LampungPipeline(gen, tok)
     router = SigerRouter(chat, lampung)
 
+    if args.info:
+        print(f"Device: {device}")
+        print(f"Checkpoint: {checkpoint}")
+        print(f"Memory: {chat.memory_stats()}")
+        return
+
+    if args.prompt:
+        handle_manual_mode(
+            normalize_mode(args.mode),
+            args.prompt,
+            chat=chat,
+            lampung=lampung,
+            router=router,
+        )
+        return
+
     print("SIGER_LLM CLI")
+    print(f"Checkpoint: {checkpoint}")
+    print(f"Device: {device}")
     print("Langsung ketik pertanyaan. Router otomatis memilih general chat atau tool Lampung.")
     print("Ketik /help untuk command opsional, /exit untuk keluar.")
 
