@@ -17,8 +17,8 @@ TRAIN_CONFIG = {
     
     # Model kecil dulu buat smoke test
     "vocab_size": 100271,
-    "d_model": 512,
-    "n_layers": 12,
+    "d_model": 256,
+    "n_layers": 8,
 
     # Training
     # "max_steps":     100_000,
@@ -28,20 +28,21 @@ TRAIN_CONFIG = {
     # "grad_accum_steps": 4,      # effective batch = 8 * 4 = 32
 
     # Training kecil
-    "max_steps": 5000,
+    "max_steps": 1500,
     "batch_size": 32,
-    "auto_scale_batch": True,
+    "auto_scale_batch": False,
     "max_auto_scale_factor": 2,
     "max_global_batch_size": 512,
-    "max_seq_len": 512 ,
-    "grad_accum_steps": 4,
+    "max_seq_len": 128 ,
+    "grad_accum_steps": 2,
     "max_chars_per_text_file": 8_000_000,
     "max_dataset_chunks": 200_000,
     "device": "auto",
     "prefer_gpu": True,
     "multi_gpu": True,
+    "resource_target_fraction": 0.8,
     "distributed_strategy": "auto",
-    "gradient_checkpointing": True,
+    "gradient_checkpointing": False,
     "sharded_checkpoint": False,
     "elastic_recovery": True,
     "auto_tune_batch_vram": False,
@@ -55,9 +56,9 @@ TRAIN_CONFIG = {
     # "grad_clip":     1.0,
 
      # Optimizer
-    "max_lr": 4e-4,
-    "min_lr": 4e-5,
-    "warmup_steps": 300,
+    "max_lr": 5e-4,
+    "min_lr": 5e-5,
+    "warmup_steps": 100,
     "weight_decay": 0.1,
     "grad_clip": 1.0,
 

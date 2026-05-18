@@ -61,9 +61,12 @@ def build_runtime_plan(
     cpu_cores: int = 1,
     max_workers: int | None = None,
     strategy: str = "auto",
+    resource_target_fraction: float = 1.0,
 ) -> RuntimePlan:
+    resource_target_fraction = max(0.1, min(1.0, resource_target_fraction))
     if cpu_cores <= 1:
         cpu_cores = os.cpu_count() or 1
+    cpu_cores = max(1, int(cpu_cores * resource_target_fraction))
     if requested_device == "auto":
         device = "cuda" if prefer_gpu and torch.cuda.is_available() else "cpu"
     else:
@@ -81,6 +84,12 @@ def build_runtime_plan(
 
     configure_cuda_runtime()
     device_count = torch.cuda.device_count()
+    if resource_target_fraction < 1.0:
+        for index in range(device_count):
+            try:
+                torch.cuda.set_per_process_memory_fraction(resource_target_fraction, device=index)
+            except RuntimeError:
+                pass
     rank = _env_int("RANK", 0)
     local_rank = _env_int("LOCAL_RANK", 0)
     world_size = _env_int("WORLD_SIZE", 1)

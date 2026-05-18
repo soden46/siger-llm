@@ -1,6 +1,7 @@
 # training/trainer.py
 import torch
 import torch.nn as nn
+import psutil
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 from typing import Optional
@@ -33,8 +34,18 @@ class Trainer:
             cpu_cores=config.get("cpu_cores", 1),
             max_workers=config.get("max_dataloader_workers"),
             strategy=config.get("distributed_strategy", "auto"),
+            resource_target_fraction=config.get("resource_target_fraction", 1.0),
         )
         self.device = self.runtime.device
+        if self.config.get("resource_target_fraction", 1.0) < 1.0:
+            max_threads = max(1, int((psutil.cpu_count(logical=True) or 1) * self.config["resource_target_fraction"]))
+            torch.set_num_threads(max_threads)
+            try:
+                torch.set_num_interop_threads(1)
+            except RuntimeError:
+                pass
+            if self.runtime.is_main_process:
+                print(f"Resource throttle: target={self.config['resource_target_fraction']:.0%}, torch_threads={max_threads}")
 
         self.model.to(self.device)
         self.model = wrap_model_for_runtime(
@@ -49,6 +60,8 @@ class Trainer:
         if config.get("auto_scale_batch", False) and self.runtime.device_count > 1:
             base_batch = int(config["batch_size"])
             factor = min(self.runtime.device_count, int(config.get("max_auto_scale_factor", 2)))
+            if config.get("resource_target_fraction", 1.0) < 1.0:
+                factor = min(factor, 1)
             max_batch = int(config.get("max_global_batch_size", base_batch))
             scaled_batch = min(base_batch * factor, max_batch)
             if scaled_batch > base_batch:

@@ -32,6 +32,7 @@ class LoRAConfig:
     distributed_strategy: str = "auto"
     sharded_checkpoint: bool = False
     elastic_recovery: bool = True
+    resource_target_fraction: float = 0.8
 
     # ── Dataset Lokal Lampung ─────────────────────────────
     dataset_path: str = "data/lampung/final/train_instruction.jsonl"

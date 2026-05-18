@@ -2,6 +2,7 @@
 import torch
 import torch.nn as nn
 import time
+import psutil
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 from functools import partial
@@ -44,8 +45,18 @@ class LoRATrainer:
             requested_device=config.device,
             cpu_cores=hardware.cpu_cores,
             strategy=config.distributed_strategy,
+            resource_target_fraction=getattr(config, "resource_target_fraction", 1.0),
         )
         self.device = self.runtime.device
+        if getattr(config, "resource_target_fraction", 1.0) < 1.0:
+            max_threads = max(1, int((psutil.cpu_count(logical=True) or 1) * config.resource_target_fraction))
+            torch.set_num_threads(max_threads)
+            try:
+                torch.set_num_interop_threads(1)
+            except RuntimeError:
+                pass
+            if self.runtime.is_main_process:
+                print(f"Resource throttle: target={config.resource_target_fraction:.0%}, torch_threads={max_threads}")
         self.model.to(self.device)
         self.model = wrap_model_for_runtime(
             self.model,
