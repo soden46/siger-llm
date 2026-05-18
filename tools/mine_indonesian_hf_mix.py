@@ -47,7 +47,12 @@ DEFAULT_SOURCES: list[HFDatasetSpec] = [
     HFDatasetSpec("kaitchup/opus-Indonesian-to-English", "translation"),
     HFDatasetSpec("Ichsan2895/alpaca-gpt4-indonesian", "instruction"),
     HFDatasetSpec("AnnasBlackHat/alpaca-indonesia-llama", "instruction"),
+    HFDatasetSpec("ermandmand/indonesian-simple-instruction-dataset", "instruction"),
+    HFDatasetSpec("IndonesiaAI/sft-dataset", "instruction"),
+    HFDatasetSpec("audichandra/bitext_customer_support_llm_dataset_indonesian", "instruction"),
+    HFDatasetSpec("LorthGyu/indonesian-qa", "qa"),
     HFDatasetSpec("theonlydo/indonesia-slang", "vocab"),
+    HFDatasetSpec("nahiar/indonesia-slang", "vocab"),
     HFDatasetSpec("arihadilahhasan/quran_terjemah_indonesia", "text"),
 ]
 

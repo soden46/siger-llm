@@ -157,9 +157,14 @@ class Trainer:
             self.model, self.optimizer, self.scheduler,
             step=global_step, loss=unscaled_loss, config=self.config,
         )
+        if unscaled_loss < best_loss or not self._best_path().exists():
+            self._save_best()
+
+    def _best_path(self):
+        return self.ckpt_manager.save_dir / "best_model.pt"
 
     def _save_best(self):
         """Simpan model terbaik terpisah."""
-        best_path = f"{self.config['checkpoint_dir']}/best_model.pt"
+        best_path = self._best_path()
         torch.save(self.model.state_dict(), best_path)
         print(f"🏆 Best model saved!")

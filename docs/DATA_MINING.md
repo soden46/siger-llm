@@ -50,7 +50,12 @@ Indonesian HF mix untuk eksperimen Kaggle:
 - `kaitchup/opus-Indonesian-to-English` sebagai translation
 - `Ichsan2895/alpaca-gpt4-indonesian` sebagai instruction
 - `AnnasBlackHat/alpaca-indonesia-llama` sebagai instruction
+- `ermandmand/indonesian-simple-instruction-dataset` sebagai instruction sederhana
+- `IndonesiaAI/sft-dataset` sebagai SFT/instruction
+- `audichandra/bitext_customer_support_llm_dataset_indonesian` sebagai customer support instruction
+- `LorthGyu/indonesian-qa` sebagai Q&A Bahasa Indonesia
 - `theonlydo/indonesia-slang` sebagai slang/vocabulary
+- `nahiar/indonesia-slang` sebagai slang/vocabulary
 - `arihadilahhasan/quran_terjemah_indonesia` sebagai raw text / text completion
 
 Catatan: `arihadilahhasan/quran_terjemah_indonesia` pernah muncul dobel di daftar eksperimen, tetapi cukup dimining satu kali.

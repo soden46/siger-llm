@@ -1,4 +1,5 @@
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -21,9 +22,23 @@ from tokenizer.hybrid_tokenizer import build_tokenizer
 def load_checkpoint_state(checkpoint_path: str) -> dict:
     path = Path(checkpoint_path)
     if not path.exists():
+        latest_meta = path.parent / "latest.json"
+        if path.name == "best_model.pt" and latest_meta.exists():
+            with latest_meta.open("r", encoding="utf-8") as f:
+                latest = json.load(f)
+            fallback = path.parent / str(latest["latest"])
+            if fallback.exists():
+                print(
+                    f"Base checkpoint {checkpoint_path} tidak ada; "
+                    f"fallback ke latest checkpoint: {fallback}"
+                )
+                path = fallback
+
+    if not path.exists():
         raise FileNotFoundError(
             f"Base checkpoint tidak ditemukan: {checkpoint_path}\n"
-            "Pastikan base training sudah menghasilkan checkpoints/best_model.pt."
+            "Pastikan base training sudah menghasilkan checkpoints/best_model.pt "
+            "atau checkpoints/latest.json."
         )
 
     checkpoint = torch.load(path, map_location="cpu")
