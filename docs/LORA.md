@@ -52,11 +52,22 @@ max_steps: 5000
 max_seq_len: 384
 ```
 
+Indonesian HF mix:
+
+```txt
+configs/training/indonesian_hf_mix_lora.json
+dataset_path: data/corpus/indonesian_hf_mix_train.jsonl
+merged_output: checkpoints/lora/model_indonesian_hf_mix_merged.pt
+max_steps: 5000
+max_seq_len: 384
+```
+
 ## Build Data Before Training
 
 ```powershell
 python tools\build_instruction_corpus.py --registry configs\datasets\lampung_instruction.json
 python tools\build_instruction_corpus.py --registry configs\datasets\general_instruction.json
+python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix.json
 ```
 
 ## Dataset Formatting

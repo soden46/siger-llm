@@ -38,6 +38,23 @@ Laravel:
 
 Catatan: link `fchis/Laravel-13x-Qwen2.5-Coder-3B-Instruct-LoRA` dan `yannelli/Laravel-11-Llama-3.2-1B-Instruct-GGUF` adalah model/checkpoint, bukan dataset mentah. Jangan dilatih ulang dari bobot model itu. Untuk data Laravel, pakai official docs, tutorial, dan dataset instruction seperti MoAA-SFT yang punya contoh Laravel.
 
+Indonesian HF mix untuk eksperimen Kaggle:
+
+- `indonesian-nlp/wikipedia-id` sebagai raw text / text completion
+- `Lyon28/Corpus-Indonesia` sebagai raw text / text completion
+- `Hemgg/indonesian2english-dataset` sebagai translation Indonesia-Inggris
+- `hndrbrm/indonesia_vocabulary` sebagai vocabulary
+- `abid/indonesia-medical-qna` sebagai medical Q&A
+- `morissu/indonesian_corpus` sebagai raw text / text completion
+- `IndonesiaAI/translated-samples` sebagai translation
+- `kaitchup/opus-Indonesian-to-English` sebagai translation
+- `Ichsan2895/alpaca-gpt4-indonesian` sebagai instruction
+- `AnnasBlackHat/alpaca-indonesia-llama` sebagai instruction
+- `theonlydo/indonesia-slang` sebagai slang/vocabulary
+- `arihadilahhasan/quran_terjemah_indonesia` sebagai raw text / text completion
+
+Catatan: `arihadilahhasan/quran_terjemah_indonesia` pernah muncul dobel di daftar eksperimen, tetapi cukup dimining satu kali.
+
 ## 2. Install Dependency Tambahan
 
 Dependency utama sudah ada di `requirements.txt`: `datasets`, `requests`, dan `beautifulsoup4`.
@@ -154,6 +171,54 @@ Report:
 data/mined/instruction/mining_report.json
 ```
 
+## 6.1 Mining Indonesian HF Mix untuk Kaggle
+
+Gunakan tool khusus ini untuk mengambil dataset HF Indonesia campuran secara streaming dan mengubahnya ke format instruction SigerLM:
+
+```powershell
+python tools\mine_indonesian_hf_mix.py --max-items-per-source 50000
+```
+
+Output utama:
+
+```txt
+data/mined/hf_indonesia/indonesian_hf_mix_instruction.jsonl
+data/indonesian_hf_mix.txt
+data/mined/hf_indonesia/hf_mix_report.json
+```
+
+`indonesian_hf_mix_instruction.jsonl` dipakai untuk LoRA/instruction tuning. `data/indonesian_hf_mix.txt` bisa ikut terbaca oleh `main.py` untuk base pretraining karena `main.py` membaca file `.txt` di folder `data/`.
+
+Untuk smoke test kecil:
+
+```powershell
+python tools\mine_indonesian_hf_mix.py --max-items-per-source 200
+```
+
+Untuk menambahkan source custom:
+
+```powershell
+python tools\mine_indonesian_hf_mix.py --source nama/dataset:instruction:train
+```
+
+Format `--source`:
+
+```txt
+dataset:kind[:split[:config[:max_items]]]
+```
+
+Kind yang didukung:
+
+```txt
+text
+instruction
+qa
+translation
+vocab
+```
+
+Kalau salah satu dataset gagal load karena schema, akses, atau dependency HF, tool akan mencatat error di report dan lanjut ke dataset berikutnya.
+
 ## 7. Build Corpus agar Bisa Dibaca SigerLM
 
 Setelah file mining tersedia:
@@ -169,6 +234,18 @@ data/corpus/general_assistant_mining_train.jsonl
 ```
 
 Untuk LoRA general assistant, arahkan config training ke corpus ini atau tambahkan sources mining ke `configs/datasets/general_instruction.json` setelah file mining stabil.
+
+Untuk Indonesian HF mix:
+
+```powershell
+python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix.json
+```
+
+Output corpus:
+
+```txt
+data/corpus/indonesian_hf_mix_train.jsonl
+```
 
 ## 8. Rekomendasi Mixing
 
@@ -209,4 +286,5 @@ Compile check:
 
 ```powershell
 python -m py_compile tools\mine_general_assistant_data.py training\dataset_registry.py tools\build_instruction_corpus.py
+python -m py_compile tools\mine_indonesian_hf_mix.py
 ```

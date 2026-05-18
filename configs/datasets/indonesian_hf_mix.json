@@ -1,0 +1,27 @@
+{
+  "name": "indonesian_hf_mix",
+  "output_path": "data/corpus/indonesian_hf_mix_train.jsonl",
+  "shuffle_seed": 42,
+  "sources": [
+    {
+      "name": "indonesian_hf_mix",
+      "path": "data/mined/hf_indonesia/indonesian_hf_mix_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI umum yang cerdas, akurat, dan ringkas.",
+      "metadata": {
+        "type": "indonesian_hf_mix"
+      }
+    },
+    {
+      "name": "lampung_augmented",
+      "path": "data/lampung/final/train_augmented_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI umum dengan kemampuan khusus Bahasa Lampung. Jawab akurat dan ringkas.",
+      "metadata": {
+        "type": "lampung_instruction"
+      }
+    }
+  ]
+}

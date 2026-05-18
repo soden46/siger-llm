@@ -35,6 +35,7 @@ pip install -r requirements.txt
 python -m py_compile chat_cli.py inference\router.py inference\lampung_pipeline.py retrieval\instruction_lookup.py retrieval\compositional_translator.py
 python -m py_compile training\dataset_registry.py tools\build_instruction_corpus.py lora\config.py lora\dataset.py lora\run_lora.py
 python -m py_compile tools\mine_general_assistant_data.py
+python -m py_compile tools\mine_indonesian_hf_mix.py
 ```
 
 ## 3. Model Forward Smoke
@@ -115,7 +116,37 @@ Build corpus setelah mining:
 python tools\build_instruction_corpus.py --registry configs\datasets\general_assistant_mining.json
 ```
 
-## 8. LoRA Training
+## 8. Mining Indonesian HF Mix di Kaggle
+
+Install dependency HF jika environment belum punya:
+
+```bash
+pip install -q datasets
+```
+
+Mining source Indonesia campuran:
+
+```bash
+python tools/mine_indonesian_hf_mix.py --max-items-per-source 50000
+```
+
+Build corpus instruction:
+
+```bash
+python tools/build_instruction_corpus.py --registry configs/datasets/indonesian_hf_mix.json
+```
+
+Output penting:
+
+```txt
+data/mined/hf_indonesia/indonesian_hf_mix_instruction.jsonl
+data/corpus/indonesian_hf_mix_train.jsonl
+data/indonesian_hf_mix.txt
+```
+
+`data/indonesian_hf_mix.txt` otomatis bisa ikut base training karena `main.py` membaca semua file `.txt` di `data/`.
+
+## 9. LoRA Training
 
 Lampung-only LoRA:
 
@@ -131,13 +162,20 @@ python tools\build_instruction_corpus.py --registry configs\datasets\general_ins
 python lora\run_lora.py --config configs\training\general_lora.json
 ```
 
+Indonesian HF mix LoRA:
+
+```powershell
+python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix.json
+python lora\run_lora.py --config configs\training\indonesian_hf_mix_lora.json
+```
+
 Default backward-compatible Lampung run:
 
 ```powershell
 python lora\run_lora.py
 ```
 
-## 9. CLI Inference Test
+## 10. CLI Inference Test
 
 Direct auto-router input:
 
