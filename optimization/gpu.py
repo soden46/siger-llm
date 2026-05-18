@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 import torch
 import torch.distributed as dist
@@ -18,6 +20,7 @@ class RuntimePlan:
     device: str
     device_count: int
     strategy: str
+    precision: str = "fp32"
     rank: int = 0
     local_rank: int = 0
     world_size: int = 1
@@ -43,6 +46,29 @@ def configure_cuda_runtime() -> None:
     torch.backends.cudnn.benchmark = True
 
 
+def select_precision(device: str, requested: str = "auto") -> str:
+    requested = (requested or "auto").lower()
+    if device != "cuda" or not torch.cuda.is_available():
+        return "fp32"
+    if requested in {"fp16", "float16"}:
+        return "fp16"
+    if requested in {"bf16", "bfloat16"}:
+        return "bf16" if torch.cuda.is_bf16_supported() else "fp16"
+    if requested in {"fp32", "float32", "full"}:
+        return "fp32"
+    if requested != "auto":
+        raise ValueError(f"Unsupported precision: {requested}")
+    return "bf16" if torch.cuda.is_bf16_supported() else "fp16"
+
+
+def amp_dtype_from_plan(plan: RuntimePlan) -> torch.dtype:
+    if plan.precision == "bf16":
+        return torch.bfloat16
+    if plan.precision == "fp16":
+        return torch.float16
+    return torch.float32
+
+
 def _env_int(name: str, default: int) -> int:
     try:
         return int(os.environ.get(name, default))
@@ -54,6 +80,39 @@ def _distributed_env_present() -> bool:
     return _env_int("WORLD_SIZE", 1) > 1 and "LOCAL_RANK" in os.environ
 
 
+def maybe_relaunch_with_torchrun(
+    *,
+    script_path: str | Path,
+    argv: list[str] | None = None,
+    strategy: str = "auto",
+    enabled: bool = True,
+) -> None:
+    """Relaunch a plain multi-GPU run as torchrun so DDP is preferred.
+
+    This keeps `python main.py` notebook-friendly while still using DDP on
+    multi-GPU machines. Set SIGER_DISABLE_AUTO_DDP=1 to keep the current
+    process and allow DataParallel fallback.
+    """
+    requested_strategy = os.environ.get("SIGER_DISTRIBUTED_STRATEGY", strategy).lower()
+    if not enabled or os.environ.get("SIGER_DISABLE_AUTO_DDP") == "1":
+        return
+    if requested_strategy not in {"auto", "ddp"}:
+        return
+    if _distributed_env_present() or not torch.cuda.is_available():
+        return
+
+    device_count = torch.cuda.device_count()
+    if device_count <= 1:
+        return
+
+    os.environ["SIGER_DISTRIBUTED_STRATEGY"] = "ddp"
+    args = [sys.executable, "-m", "torch.distributed.run", "--standalone", f"--nproc_per_node={device_count}", str(script_path)]
+    if argv:
+        args.extend(argv)
+    print(f"Auto-launching DDP with torchrun on {device_count} GPUs...")
+    os.execv(sys.executable, args)
+
+
 def build_runtime_plan(
     *,
     prefer_gpu: bool = True,
@@ -62,6 +121,7 @@ def build_runtime_plan(
     max_workers: int | None = None,
     strategy: str = "auto",
     resource_target_fraction: float = 1.0,
+    precision: str = "auto",
 ) -> RuntimePlan:
     resource_target_fraction = max(0.1, min(1.0, resource_target_fraction))
     if cpu_cores <= 1:
@@ -78,11 +138,13 @@ def build_runtime_plan(
             device="cpu",
             device_count=0,
             strategy="cpu",
+            precision="fp32",
             dataloader_workers=workers,
             pin_memory=False,
         )
 
     configure_cuda_runtime()
+    selected_precision = select_precision("cuda", precision)
     device_count = torch.cuda.device_count()
     if resource_target_fraction < 1.0:
         for index in range(device_count):
@@ -108,11 +170,16 @@ def build_runtime_plan(
         effective_device_count = 1
 
     default_workers = 2 if cpu_cores >= 4 else 1
-    workers = min(max_workers if max_workers is not None else default_workers, max(cpu_cores - 1, 0))
+    worker_cap = max_workers if max_workers is not None else default_workers
+    if strategy in {"ddp", "fsdp"}:
+        workers = min(worker_cap, max(1, (cpu_cores - 1) // max(1, world_size)))
+    else:
+        workers = min(worker_cap, max(cpu_cores - 1, 0))
     return RuntimePlan(
         device="cuda",
         device_count=effective_device_count,
         strategy=strategy,
+        precision=selected_precision,
         rank=rank,
         local_rank=local_rank,
         world_size=world_size,
@@ -127,6 +194,7 @@ def print_runtime_plan(plan: RuntimePlan) -> None:
     print("Runtime plan")
     print(f"  strategy  : {plan.strategy}")
     print(f"  devices   : {plan.device_count}")
+    print(f"  precision : {plan.precision}")
     print(f"  workers   : {plan.dataloader_workers}")
     print(f"  pin memory: {plan.pin_memory}")
 

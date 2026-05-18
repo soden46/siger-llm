@@ -30,6 +30,11 @@ class LoRAConfig:
     device: str = "auto"  # "auto", "cpu", or "cuda"
     prefer_gpu: bool = True
     distributed_strategy: str = "auto"
+    precision: str = "auto"
+    max_dataloader_workers: Optional[int] = None
+    auto_tune_batch_vram: bool = True
+    max_global_batch_size: int = 16
+    vram_safety_fraction: float = 0.75
     sharded_checkpoint: bool = False
     elastic_recovery: bool = True
     resource_target_fraction: float = 0.8

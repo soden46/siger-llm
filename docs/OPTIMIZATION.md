@@ -20,25 +20,37 @@ Training uses `optimization/gpu.py` to choose a runtime strategy dynamically:
 ```txt
 cpu            CPU-only fallback
 single_gpu     one CUDA GPU
-data_parallel  single-process multi-GPU notebook/runtime
+data_parallel  fallback single-process multi-GPU runtime
 ddp            torchrun/DDP when WORLD_SIZE and LOCAL_RANK are present
 ```
 
 The planner enables TF32 CUDA defaults, chooses conservative dataloader workers, uses pinned memory on CUDA, and unwraps `DataParallel` / `DistributedDataParallel` before saving checkpoints.
 
-For Kaggle T4x2, the expected strategy is `data_parallel`. For cluster experiments launched with `torchrun`, the expected strategy is `ddp`.
+For Kaggle T4x2, `python main.py` auto-relaunches through `torchrun` and prefers `ddp`. `data_parallel` remains a fallback if `SIGER_DISABLE_AUTO_DDP=1` is set or auto-DDP is not available.
 
-Base training can opt into conservative batch scaling:
+Mixed precision is selected automatically:
+
+```txt
+CUDA bf16-supported GPU  -> bf16
+CUDA fp16 GPU, e.g. T4   -> fp16
+CPU                      -> fp32
+```
+
+Base training can opt into conservative batch scaling and VRAM-aware batch tuning:
 
 ```json
 {
   "auto_scale_batch": true,
   "max_auto_scale_factor": 2,
-  "max_global_batch_size": 512
+  "auto_tune_batch_vram": true,
+  "max_global_batch_size": 128,
+  "vram_safety_fraction": 0.75
 }
 ```
 
 This uses more available GPU capacity without allowing batch size to grow unbounded on larger machines.
+
+Dataloader worker counts are auto-scaled with a CPU cap. In DDP/FSDP, workers are split per rank to avoid saturating Kaggle CPU. Persistent workers and prefetching are enabled when `num_workers > 0`.
 
 Experimental cluster-scaling features now available:
 

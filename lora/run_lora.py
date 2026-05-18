@@ -15,7 +15,7 @@ from lora.model import LoRAModel
 from lora.trainer import LoRATrainer
 from model.siger_model import SigerLM
 from optimization.cpu.threading import configure_cpu
-from optimization.gpu import barrier, cleanup_distributed, is_main_process
+from optimization.gpu import barrier, cleanup_distributed, is_main_process, maybe_relaunch_with_torchrun
 from optimization.hardware import detect_hardware, print_hardware_profile
 from tokenizer.hybrid_tokenizer import build_tokenizer
 
@@ -126,11 +126,18 @@ def default_lora_config(device: str) -> LoRAConfig:
         weight_decay=0.01,
         device=device,
         prefer_gpu=True,
+        distributed_strategy="auto",
+        precision="auto",
+        max_dataloader_workers=2,
+        auto_tune_batch_vram=True,
+        max_global_batch_size=16,
+        vram_safety_fraction=0.75,
+        resource_target_fraction=0.8,
         dataset_path="data/lampung/final/train_augmented_instruction.jsonl",
         max_samples=None,
         base_checkpoint="./checkpoints/best_model.pt",
         save_dir="./checkpoints/lora/lampung",
-        save_every=500,
+        save_every=250,
         log_interval=10,
         merged_output="./checkpoints/lora/model_lampung_merged.pt",
     )
@@ -165,6 +172,12 @@ def main() -> None:
         configure_cpu(n_cores=n_cores)
 
     lora_config = load_lora_config(args.config, hardware.device)
+    maybe_relaunch_with_torchrun(
+        script_path=Path(__file__).resolve(),
+        argv=sys.argv[1:],
+        strategy=lora_config.distributed_strategy,
+        enabled=(lora_config.device == "cuda" and lora_config.prefer_gpu),
+    )
     print(f"Training dataset: {lora_config.dataset_path or lora_config.dataset_name}")
     print(f"Save dir: {lora_config.save_dir}")
 

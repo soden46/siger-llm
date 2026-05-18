@@ -12,6 +12,7 @@ from .logger      import TrainingLogger
 from .dataset     import TextDataset
 from tokenizer.tokenizer import MultilingualTokenizer
 from optimization.gpu import (
+    amp_dtype_from_plan,
     barrier,
     build_runtime_plan,
     cleanup_distributed,
@@ -35,8 +36,10 @@ class Trainer:
             max_workers=config.get("max_dataloader_workers"),
             strategy=config.get("distributed_strategy", "auto"),
             resource_target_fraction=config.get("resource_target_fraction", 1.0),
+            precision=config.get("precision", "auto"),
         )
         self.device = self.runtime.device
+        self.amp_dtype = amp_dtype_from_plan(self.runtime)
         if self.config.get("resource_target_fraction", 1.0) < 1.0:
             max_threads = max(1, int((psutil.cpu_count(logical=True) or 1) * self.config["resource_target_fraction"]))
             torch.set_num_threads(max_threads)
@@ -57,7 +60,11 @@ class Trainer:
             print(f"🖥️  Device: {self.device}")
             print_runtime_plan(self.runtime)
 
-        if config.get("auto_scale_batch", False) and self.runtime.device_count > 1:
+        if (
+            config.get("auto_scale_batch", False)
+            and self.runtime.device_count > 1
+            and not self.runtime.is_distributed
+        ):
             base_batch = int(config["batch_size"])
             factor = min(self.runtime.device_count, int(config.get("max_auto_scale_factor", 2)))
             if config.get("resource_target_fraction", 1.0) < 1.0:
@@ -81,7 +88,8 @@ class Trainer:
             if tuned_batch > base_batch:
                 config["batch_size"] = tuned_batch
                 if self.runtime.is_main_process:
-                    print(f"VRAM-tuned global batch_size: {base_batch} -> {tuned_batch}")
+                    scope = "per-rank" if self.runtime.is_distributed else "global"
+                    print(f"VRAM-tuned {scope} batch_size: {base_batch} -> {tuned_batch}")
 
         # Komponen training
         self.optimizer = build_optimizer(
@@ -109,14 +117,21 @@ class Trainer:
 
     def _build_dataloader(self, dataset: TextDataset) -> DataLoader:
         sampler = DistributedSampler(dataset, shuffle=True) if self.runtime.is_distributed else None
+        configured_workers = self.config.get("num_workers", "auto")
+        num_workers = self.runtime.dataloader_workers if configured_workers in {None, "auto"} else int(configured_workers)
+        loader_kwargs = {}
+        if num_workers > 0:
+            loader_kwargs["persistent_workers"] = True
+            loader_kwargs["prefetch_factor"] = int(self.config.get("prefetch_factor", 2))
         return DataLoader(
             dataset,
             batch_size=self.config["batch_size"],
             shuffle=(sampler is None),
             sampler=sampler,
-            num_workers=self.config.get("num_workers", self.runtime.dataloader_workers),
+            num_workers=num_workers,
             pin_memory=self.runtime.pin_memory,
             drop_last=True,
+            **loader_kwargs,
         )
 
     def train_step(self, x: torch.Tensor, y: torch.Tensor) -> float:
@@ -125,8 +140,11 @@ class Trainer:
         y = y.to(self.device)
 
         # Mixed precision (otomatis kalau CUDA)
-        with torch.autocast(device_type=self.device, dtype=torch.float16,
-                            enabled=(self.device == "cuda")):
+        with torch.autocast(
+            device_type=self.device,
+            dtype=self.amp_dtype,
+            enabled=(self.device == "cuda" and self.runtime.precision != "fp32"),
+        ):
             _, loss = self.model(x, targets=y)
             if loss.dim() > 0:
                 loss = loss.mean()
@@ -146,7 +164,10 @@ class Trainer:
         
         # 1. Pastikan device_type string untuk GradScaler
         device_type = "cuda" if "cuda" in self.device else "cpu"
-        scaler = torch.amp.GradScaler(device_type, enabled=(device_type == "cuda"))
+        scaler = torch.amp.GradScaler(
+            device_type,
+            enabled=(device_type == "cuda" and self.runtime.precision == "fp16"),
+        )
         
         global_step = 0
         best_loss = float("inf")
@@ -159,9 +180,11 @@ class Trainer:
         self.model.train()
         max_steps = self.config["max_steps"]
         print(f"\n🚀 Training starts | max_steps={max_steps:,}")
+        effective_batch = self.config["batch_size"] * self.accum_steps * max(1, self.runtime.world_size)
         print(f"   batch_size={self.config['batch_size']} | "
               f"grad_accum={self.accum_steps} | "
-              f"effective_batch={self.config['batch_size'] * self.accum_steps}\n")
+              f"world_size={self.runtime.world_size} | "
+              f"effective_batch={effective_batch}\n")
 
         self.optimizer.zero_grad()
         epoch = 0
@@ -175,8 +198,13 @@ class Trainer:
                     break
 
                 # Forward + Backward menggunakan AMP Scaler yang benar
-                x, y = x.to(self.device), y.to(self.device)
-                with torch.autocast(device_type=device_type, dtype=torch.float16, enabled=(device_type == "cuda")):
+                x = x.to(self.device, non_blocking=self.runtime.pin_memory)
+                y = y.to(self.device, non_blocking=self.runtime.pin_memory)
+                with torch.autocast(
+                    device_type=device_type,
+                    dtype=self.amp_dtype,
+                    enabled=(device_type == "cuda" and self.runtime.precision != "fp32"),
+                ):
                     _, loss = self.model(x, targets=y)
                     if loss.dim() > 0:
                         loss = loss.mean()
@@ -202,7 +230,10 @@ class Trainer:
 
                     # Hitung throughput tokens
                     tokens_per_step = (
-                        self.config["batch_size"] * self.config["max_seq_len"] * self.accum_steps
+                        self.config["batch_size"]
+                        * self.config["max_seq_len"]
+                        * self.accum_steps
+                        * max(1, self.runtime.world_size)
                     )
 
                     # Logging

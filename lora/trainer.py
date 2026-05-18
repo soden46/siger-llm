@@ -13,7 +13,9 @@ from .model   import LoRAModel
 from .dataset import InstructionDataset, collate_fn
 from training.optimizer import CosineScheduler
 from training.logger    import TrainingLogger
+from optimization.autotune import suggest_cuda_batch_size
 from optimization.gpu import (
+    amp_dtype_from_plan,
     barrier,
     build_runtime_plan,
     print_runtime_plan,
@@ -44,10 +46,13 @@ class LoRATrainer:
             prefer_gpu=config.prefer_gpu,
             requested_device=config.device,
             cpu_cores=hardware.cpu_cores,
+            max_workers=config.max_dataloader_workers,
             strategy=config.distributed_strategy,
             resource_target_fraction=getattr(config, "resource_target_fraction", 1.0),
+            precision=config.precision,
         )
         self.device = self.runtime.device
+        self.amp_dtype = amp_dtype_from_plan(self.runtime)
         if getattr(config, "resource_target_fraction", 1.0) < 1.0:
             max_threads = max(1, int((psutil.cpu_count(logical=True) or 1) * config.resource_target_fraction))
             torch.set_num_threads(max_threads)
@@ -64,6 +69,22 @@ class LoRATrainer:
             enabled=True,
         )
         print_runtime_plan(self.runtime)
+
+        if config.auto_tune_batch_vram:
+            base_batch = int(config.batch_size)
+            d_model = int(getattr(getattr(lora_model.base_model, "config", None), "d_model", 256))
+            tuned_batch = suggest_cuda_batch_size(
+                base_batch_size=base_batch,
+                max_batch_size=int(config.max_global_batch_size),
+                max_seq_len=int(config.max_seq_len),
+                d_model=d_model,
+                safety_fraction=float(config.vram_safety_fraction),
+            )
+            if tuned_batch > base_batch:
+                config.batch_size = tuned_batch
+                if self.runtime.is_main_process:
+                    scope = "per-rank" if self.runtime.is_distributed else "global"
+                    print(f"VRAM-tuned LoRA {scope} batch_size: {base_batch} -> {tuned_batch}")
 
         # Hanya optimize LoRA params
         lora_params = [
@@ -89,6 +110,10 @@ class LoRATrainer:
     def train(self, dataset: InstructionDataset):
         elastic_state = install_signal_handlers() if self.config.elastic_recovery else None
         sampler = DistributedSampler(dataset, shuffle=True) if self.runtime.is_distributed else None
+        loader_kwargs = {}
+        if self.runtime.dataloader_workers > 0:
+            loader_kwargs["persistent_workers"] = True
+            loader_kwargs["prefetch_factor"] = 2
         loader = DataLoader(
             dataset,
             batch_size=self.config.batch_size,
@@ -97,19 +122,27 @@ class LoRATrainer:
             collate_fn=partial(collate_fn, pad_id=self.tokenizer.pad_id),
             num_workers=self.runtime.dataloader_workers,
             pin_memory=self.runtime.pin_memory,
+            **loader_kwargs,
         )
 
         print(f"\n🚀 LoRA Training")
         print(f"   Dataset   : {len(dataset):,} examples")
         print(f"   Max steps : {self.config.max_steps:,}")
         print(f"   Batch size: {self.config.batch_size} × {self.config.grad_accum} accum")
-        print(f"   Eff. batch: {self.config.batch_size * self.config.grad_accum}\n")
+        print(f"   World size: {self.runtime.world_size}")
+        print(f"   Eff. batch: {self.config.batch_size * self.config.grad_accum * max(1, self.runtime.world_size)}\n")
 
         self.model.train()
         step = 0
         tokens_since_step = 0
         last_step_time = time.time()
         self.optimizer.zero_grad()
+        device_type = "cuda" if self.device == "cuda" else "cpu"
+        scaler = torch.amp.GradScaler(
+            device_type,
+            enabled=(device_type == "cuda" and self.runtime.precision == "fp16"),
+        )
+        last_loss = float("inf")
 
         while step < self.config.max_steps:
             if self.runtime.is_distributed and hasattr(loader.sampler, "set_epoch"):
@@ -118,8 +151,8 @@ class LoRATrainer:
                 if step >= self.config.max_steps or (elastic_state and elastic_state.should_stop):
                     break
 
-                input_ids = batch["input_ids"].to(self.device)
-                labels    = batch["labels"].to(self.device)
+                input_ids = batch["input_ids"].to(self.device, non_blocking=self.runtime.pin_memory)
+                labels = batch["labels"].to(self.device, non_blocking=self.runtime.pin_memory)
                 attention_mask = batch.get("attention_mask")
                 if attention_mask is not None:
                     tokens_since_step += int(attention_mask.sum().item())
@@ -127,25 +160,33 @@ class LoRATrainer:
                     tokens_since_step += int((input_ids != self.tokenizer.pad_id).sum().item())
 
                 # Forward
-                logits, _ = self.model(input_ids)
+                with torch.autocast(
+                    device_type=device_type,
+                    dtype=self.amp_dtype,
+                    enabled=(device_type == "cuda" and self.runtime.precision != "fp32"),
+                ):
+                    logits, _ = self.model(input_ids)
 
-                shift_logits = logits[:, :-1, :].contiguous()
-                shift_labels = labels[:, 1:].contiguous()
+                    shift_logits = logits[:, :-1, :].contiguous()
+                    shift_labels = labels[:, 1:].contiguous()
 
-                loss = nn.functional.cross_entropy(
-                    shift_logits.view(-1, shift_logits.size(-1)),
-                    shift_labels.view(-1),
-                    ignore_index=-100,
-                    label_smoothing=0.0,
-                )
-                loss = loss / self.config.grad_accum
-                loss.backward()
+                    loss = nn.functional.cross_entropy(
+                        shift_logits.view(-1, shift_logits.size(-1)),
+                        shift_labels.view(-1),
+                        ignore_index=-100,
+                        label_smoothing=0.0,
+                    )
+                    loss = loss / self.config.grad_accum
+                scaler.scale(loss).backward()
+                last_loss = loss.item() * self.config.grad_accum
 
                 if (step + 1) % self.config.grad_accum == 0:
+                    scaler.unscale_(self.optimizer)
                     torch.nn.utils.clip_grad_norm_(
                         self.model.parameters(), 1.0
                     )
-                    self.optimizer.step()
+                    scaler.step(self.optimizer)
+                    scaler.update()
                     self.optimizer.zero_grad()
                     lr = self.scheduler.step()
 
@@ -158,13 +199,13 @@ class LoRATrainer:
                     if self.runtime.is_main_process:
                         self.logger.log(
                             step,
-                            loss.item() * self.config.grad_accum,
+                            last_loss,
                             lr,
                             tokens_per_sec=tokens_per_sec,
                         )
 
                     if self.runtime.is_main_process and step > 0 and step % self.config.save_every == 0:
-                        self._save(step, loss.item())
+                        self._save(step, last_loss)
                         if self.config.sharded_checkpoint:
                             save_sharded_checkpoint(
                                 model=self.model,
@@ -172,7 +213,7 @@ class LoRATrainer:
                                 scheduler=self.scheduler,
                                 output_dir=Path(self.config.save_dir) / f"sharded_step_{step:06d}",
                                 step=step,
-                                loss=loss.item(),
+                                loss=last_loss,
                                 config=self.config.__dict__,
                             )
 
@@ -185,7 +226,7 @@ class LoRATrainer:
         if self.runtime.is_distributed:
             barrier()
         if self.runtime.is_main_process:
-            self._save(step, loss.item())
+            self._save(step, last_loss)
             if self.config.sharded_checkpoint:
                 save_sharded_checkpoint(
                     model=self.model,
@@ -193,7 +234,7 @@ class LoRATrainer:
                     scheduler=self.scheduler,
                     output_dir=Path(self.config.save_dir) / "sharded_final",
                     step=step,
-                    loss=loss.item(),
+                    loss=last_loss,
                     config=self.config.__dict__,
                 )
         print("\n✅ LoRA training complete!")

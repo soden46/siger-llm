@@ -1,4 +1,5 @@
 # main.py
+import sys
 import torch
 from pathlib import Path
 from config.model_config   import SigerConfig
@@ -7,6 +8,7 @@ from tokenizer.hybrid_tokenizer import build_tokenizer
 from training.dataset      import TextDataset
 from training.trainer      import Trainer
 from model.ssm_core import SSMCore
+from optimization.gpu import maybe_relaunch_with_torchrun
 
 # ── Config ──────────────────────────────────────────────────
 TRAIN_CONFIG = {
@@ -30,9 +32,9 @@ TRAIN_CONFIG = {
     # Training kecil
     "max_steps": 1500,
     "batch_size": 32,
-    "auto_scale_batch": False,
+    "auto_scale_batch": True,
     "max_auto_scale_factor": 2,
-    "max_global_batch_size": 512,
+    "max_global_batch_size": 128,
     "max_seq_len": 128 ,
     "grad_accum_steps": 2,
     "max_chars_per_text_file": 8_000_000,
@@ -40,13 +42,14 @@ TRAIN_CONFIG = {
     "device": "auto",
     "prefer_gpu": True,
     "multi_gpu": True,
+    "precision": "auto",
     "resource_target_fraction": 0.8,
     "distributed_strategy": "auto",
     "gradient_checkpointing": False,
     "sharded_checkpoint": False,
     "elastic_recovery": True,
-    "auto_tune_batch_vram": False,
-    "vram_safety_fraction": 0.70,
+    "auto_tune_batch_vram": True,
+    "vram_safety_fraction": 0.75,
 
     # Optimizer
     # "max_lr":        3e-4,
@@ -70,12 +73,21 @@ TRAIN_CONFIG = {
 
     # Logging & saving
     "log_interval": 10,
-    "save_every": 1000,
+    "save_every": 250,
     "checkpoint_dir": "./checkpoints",
-    "num_workers": 0,
+    "num_workers": "auto",
+    "max_dataloader_workers": 2,
+    "prefetch_factor": 2,
 }
 
 def main():
+    maybe_relaunch_with_torchrun(
+        script_path=Path(__file__).resolve(),
+        argv=sys.argv[1:],
+        strategy=TRAIN_CONFIG.get("distributed_strategy", "auto"),
+        enabled=TRAIN_CONFIG.get("multi_gpu", True),
+    )
+
     # 1. Tokenizer
     tok = build_tokenizer("auto")
     print(f"Tokenizer backend: {tok.backend} | vocab_size={tok.vocab_size}")

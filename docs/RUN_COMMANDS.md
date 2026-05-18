@@ -52,17 +52,22 @@ python -c "import torch; from config.model_config import SigerConfig; from model
 python main.py
 ```
 
-Jika runtime punya lebih dari satu GPU CUDA, trainer otomatis memakai `torch.nn.DataParallel`.
+Jika runtime punya lebih dari satu GPU CUDA, `main.py` otomatis re-launch lewat `torchrun` dan memakai DDP.
 Log yang diharapkan:
 
 ```txt
+Auto-launching DDP with torchrun on 2 GPUs...
 Runtime plan
-  strategy  : data_parallel
+  strategy  : ddp
   devices   : 2
-Using DataParallel on 2 GPUs: Tesla T4, Tesla T4
+  precision : fp16
 ```
 
-`main.py` juga mengaktifkan `auto_scale_batch` secara konservatif: batch global 256 bisa naik sampai 512 saat ada 2+ GPU, tetapi tidak akan naik tanpa batas di cluster besar.
+`main.py` juga mengaktifkan AMP otomatis, dataloader auto worker, dan VRAM-aware batch tuning secara konservatif. Kalau ingin mematikan auto-DDP dan memakai fallback single-process:
+
+```bash
+SIGER_DISABLE_AUTO_DDP=1 python main.py
+```
 
 ## 5. Build Dataset Lampung
 
@@ -202,7 +207,7 @@ python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_
 python lora\run_lora.py --config configs\training\indonesian_hf_mix_plus_kaggle_lora.json
 ```
 
-Config Indonesian HF mix memakai `batch_size=2` supaya DataParallel bisa membagi batch ke dua GPU. Ini tetap konservatif untuk T4x2 karena effective batch masih `2 x 4 accum = 8`.
+Config Indonesian HF mix memakai `batch_size=2` sebagai titik awal aman. Trainer LoRA bisa menaikkan batch secara konservatif lewat VRAM-aware tuning.
 
 Untuk cluster atau multi-process launch, runtime planner juga membaca environment `WORLD_SIZE`, `RANK`, dan `LOCAL_RANK`. Jalur ini dipakai jika training diluncurkan dengan `torchrun`.
 
@@ -211,6 +216,13 @@ Contoh single-node DDP:
 ```bash
 torchrun --standalone --nproc_per_node=2 main.py
 torchrun --standalone --nproc_per_node=2 lora/run_lora.py --config configs/training/indonesian_hf_mix_lora.json
+```
+
+Di Kaggle T4x2, command sederhana juga bisa:
+
+```bash
+python main.py
+python lora/run_lora.py --config configs/training/indonesian_hf_mix_plus_kaggle_lora.json
 ```
 
 Default backward-compatible Lampung run:
