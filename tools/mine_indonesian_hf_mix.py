@@ -54,17 +54,13 @@ DEFAULT_SOURCES: list[HFDatasetSpec] = [
     HFDatasetSpec("morissu/indonesian_corpus", "text"),
     HFDatasetSpec("IndonesiaAI/translated-samples", "translation"),
     HFDatasetSpec("kaitchup/opus-Indonesian-to-English", "translation"),
-    HFDatasetSpec("Ichsan2895/alpaca-gpt4-indonesian", "instruction"),
-    HFDatasetSpec("AnnasBlackHat/alpaca-indonesia-llama", "instruction"),
     HFDatasetSpec("ermandmand/indonesian-simple-instruction-dataset", "instruction"),
     HFDatasetSpec("IndonesiaAI/sft-dataset", "instruction"),
     HFDatasetSpec("audichandra/bitext_customer_support_llm_dataset_indonesian", "instruction"),
     HFDatasetSpec("LorthGyu/indonesian-qa", "qa"),
     HFDatasetSpec("theonlydo/indonesia-slang", "vocab"),
     HFDatasetSpec("nahiar/indonesia-slang", "vocab"),
-    HFDatasetSpec("arihadilahhasan/quran_terjemah_indonesia", "text"),
 ]
-
 
 def normalize_text(value: Any) -> str:
     return re.sub(r"\s+", " ", str(value or "").replace("\xa0", " ")).strip()
@@ -530,7 +526,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    sources = list(args.source) if args.only_custom_sources else [*DEFAULT_SOURCES, *args.source]
+    default_sources = list(DEFAULT_SOURCES)
+    sources = list(args.source) if args.only_custom_sources else [*default_sources, *args.source]
     report = mine_sources(
         sources,
         instruction_output=Path(args.instruction_output),

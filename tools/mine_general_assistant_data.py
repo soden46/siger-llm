@@ -44,10 +44,22 @@ HF_QA_SOURCES = ["SEACrowd/indoqa"]
 LARGE_HF_QA_SOURCES = ["SEACrowd/tydiqa_id"]
 HF_INSTRUCTION_SOURCES = [
     "togethercomputer/MoAA-SFT",
-    "FreedomIntelligence/alpaca-gpt4-indonesian",
-    "FreedomIntelligence/evol-instruct-indonesian",
 ]
 GATED_HF_INSTRUCTION_SOURCES = ["Iftitahu/indonesian_instruct_stories"]
+HF_COMMERCIAL_SAFE_INSTRUCTION_SOURCES = [
+    ("QuixiAI/dolphin", "flan1m-alpaca-uncensored", None),
+]
+HF_COMMERCIAL_SAFE_REASONING_SOURCES = [
+    ("microsoft/orca-math-word-problems-200k", "qa", None, None),
+    ("openbmb/UltraInteract_pair", "preference", None, None),
+    (
+        "xTayyub/High-Quality-Synthetic-Python-Dataset-with-Reasoning-Traces-Chain-of-Thought-for-LLM-Fine-Tuning",
+        "code",
+        None,
+        None,
+    ),
+    ("HuggingFaceTB/cosmopedia", "text", "stories", "train"),
+]
 HF_CODE_EVAL_SOURCES = [
     "openai/openai_humaneval",
     "loubnabnl/humaneval_infilling",
@@ -173,7 +185,7 @@ def extract_answer(value: Any) -> str:
                 return answer
         return ""
     if isinstance(value, dict):
-        for key in ["text", "answer", "answers", "value"]:
+        for key in ["content", "text", "answer", "answers", "value", "response", "output"]:
             answer = extract_answer(value.get(key))
             if answer:
                 return answer
@@ -235,13 +247,69 @@ def row_to_instruction(row: dict[str, Any], source_name: str) -> list[dict[str, 
 
     instruction = normalize_text(first_value(row, ["instruction", "prompt", "question", "input", "query"]))
     input_text = clean_text(first_value(row, ["context", "input", "source"]) or "")
-    output = clean_text(first_value(row, ["output", "response", "answer", "completion", "target"]) or "")
+    output = clean_text(first_value(row, ["output", "response", "answer", "completion", "target", "chosen"]) or "")
     built = instruction_row(
         instruction,
         output,
         input_text=input_text if input_text != instruction else "",
         source=source_name,
         task_type="general_instruction",
+    )
+    return [built] if built else []
+
+
+def row_to_text_completion(row: dict[str, Any], source_name: str) -> list[dict[str, Any]]:
+    text = clean_text(
+        first_value(
+            row,
+            ["text", "content", "article", "document", "story", "markdown", "prompt", "output", "response"],
+        )
+        or ""
+    )
+    words = text.split()
+    if len(words) < 40:
+        return []
+    split_at = max(12, int(len(words) * 0.35))
+    prompt = " ".join(words[:split_at])
+    continuation = " ".join(words[split_at:])
+    built = instruction_row(
+        "Lanjutkan teks berikut secara natural.",
+        continuation,
+        input_text=prompt,
+        source=source_name,
+        task_type="commercial_safe_text_completion",
+    )
+    return [built] if built else []
+
+
+def row_to_preference_instruction(row: dict[str, Any], source_name: str) -> list[dict[str, Any]]:
+    instruction = normalize_text(
+        first_value(row, ["instruction", "prompt", "question", "query", "task", "input"])
+    )
+    input_text = clean_text(first_value(row, ["context", "input", "source"]) or "")
+    output_value = first_value(
+        row,
+        [
+            "chosen",
+            "chosen_response",
+            "accepted",
+            "winner",
+            "response_j",
+            "good_response",
+            "target",
+            "output",
+            "answer",
+        ],
+    )
+    output = clean_text(extract_answer(output_value))
+    if not output and output_value is not None:
+        output = clean_text(output_value)
+    built = instruction_row(
+        instruction,
+        output,
+        input_text=input_text if input_text != instruction else "",
+        source=source_name,
+        task_type="commercial_safe_preference_chosen",
     )
     return [built] if built else []
 
@@ -307,15 +375,25 @@ def row_to_code_instruction(row: dict[str, Any], source_name: str, *, laravel: b
                 "completion",
                 "canonical_solution",
                 "solution",
+                "code_solution",
                 "code",
                 "target",
                 "accepted_answer",
+                "final_answer",
+                "assistant",
                 "suffix",
                 "after",
             ],
         )
         or ""
     )
+    thought = clean_text(first_value(row, ["thought_process", "reasoning", "cot", "chain_of_thought", "analysis"]) or "")
+    explanation = clean_text(first_value(row, ["explanation", "final_answer", "summary"]) or "")
+    if thought and output and "<thought>" not in output and "<think>" not in output:
+        tail = output
+        if explanation and explanation not in tail:
+            tail = f"{tail}\n\nPenjelasan:\n{explanation}"
+        output = f"<thought> {normalize_text(thought)} </thought>\n{tail}"
     tests = clean_text(first_value(row, ["test", "tests", "unit_tests", "example_test"]) or "")
     entry_point = normalize_text(first_value(row, ["entry_point", "function_name", "name"]) or "")
 
@@ -369,7 +447,7 @@ def iter_hf_rows(dataset_name: str, *, config_name: str | None = None, split: st
             'Run: pip install "datasets>=2.18,<3" --force-reinstall'
         )
 
-    kwargs: dict[str, Any] = {"trust_remote_code": True}
+    kwargs: dict[str, Any] = {"trust_remote_code": True, "streaming": True}
     if split:
         kwargs["split"] = split
 
@@ -420,6 +498,10 @@ def mine_hf_dataset(
                 rows.extend(row_to_code_instruction(raw, source_name, laravel=False))
             elif kind == "laravel":
                 rows.extend(row_to_code_instruction(raw, source_name, laravel=True))
+            elif kind == "text":
+                rows.extend(row_to_text_completion(raw, source_name))
+            elif kind == "preference":
+                rows.extend(row_to_preference_instruction(raw, source_name))
             else:
                 raise ValueError(f"Unsupported HF mining kind: {kind}")
 
@@ -714,11 +796,11 @@ def write_report(path: Path, stats: list[MineStats]) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Mine Q&A, instruction, code, and Laravel sources into instruction JSONL.")
-    parser.add_argument("--preset", choices=["all", "qa", "instruction", "code", "laravel"], default="all")
+    parser.add_argument("--preset", choices=["all", "qa", "instruction", "code", "reasoning", "laravel"], default="all")
     parser.add_argument("--output-dir", default="data/mined/instruction")
     parser.add_argument("--max-items", type=int, default=None, help="Limit rows per HF/local source.")
     parser.add_argument("--hf-source", action="append", default=[], help="Extra HF dataset name.")
-    parser.add_argument("--hf-kind", choices=["qa", "instruction", "code", "laravel"], default="instruction")
+    parser.add_argument("--hf-kind", choices=["qa", "instruction", "code", "reasoning", "text", "preference", "laravel"], default="instruction")
     parser.add_argument("--hf-config", default=None)
     parser.add_argument("--hf-split", default=None)
     parser.add_argument(
@@ -749,12 +831,13 @@ def main() -> None:
     qa_output = output_dir / "indonesian_qa_instruction.jsonl"
     instruction_output = output_dir / "indonesian_general_instruction.jsonl"
     code_output = output_dir / "code_instruction.jsonl"
+    reasoning_output = output_dir / "commercial_safe_reasoning_instruction.jsonl"
     laravel_output = output_dir / "laravel_instruction.jsonl"
     report_output = output_dir / "mining_report.json"
     stats: list[MineStats] = []
 
-    reset_outputs([qa_output, instruction_output, code_output, laravel_output])
-    for output_path in [qa_output, instruction_output, code_output, laravel_output]:
+    reset_outputs([qa_output, instruction_output, code_output, reasoning_output, laravel_output])
+    for output_path in [qa_output, instruction_output, code_output, reasoning_output, laravel_output]:
         touch_jsonl(output_path)
 
     if args.preset in {"all", "qa"}:
@@ -772,6 +855,19 @@ def main() -> None:
             instruction_sources.extend(GATED_HF_INSTRUCTION_SOURCES)
         for source in instruction_sources:
             stats.append(mine_hf_dataset(source, instruction_output, kind="instruction", max_items=args.max_items, cot_ratio=args.cot_ratio, cot_mode=args.cot_mode))
+        for source, config_name, split in HF_COMMERCIAL_SAFE_INSTRUCTION_SOURCES:
+            stats.append(
+                mine_hf_dataset(
+                    source,
+                    instruction_output,
+                    kind="instruction",
+                    config_name=config_name,
+                    split=split,
+                    max_items=args.max_items,
+                    cot_ratio=args.cot_ratio,
+                    cot_mode=args.cot_mode,
+                )
+            )
 
     if args.preset in {"all", "code"}:
         for source in HF_CODE_EVAL_SOURCES:
@@ -786,20 +882,38 @@ def main() -> None:
                 )
             )
 
+    if args.preset in {"all", "reasoning"}:
+        for source, kind, config_name, split in HF_COMMERCIAL_SAFE_REASONING_SOURCES:
+            stats.append(
+                mine_hf_dataset(
+                    source,
+                    reasoning_output,
+                    kind=kind,
+                    config_name=config_name,
+                    split=split,
+                    max_items=args.max_items,
+                    cot_ratio=args.cot_ratio,
+                    cot_mode=args.cot_mode,
+                )
+            )
+
     for source in args.hf_source:
         if args.hf_kind == "qa":
             output = qa_output
         elif args.hf_kind == "code":
             output = code_output
+        elif args.hf_kind in {"reasoning", "text", "preference"}:
+            output = reasoning_output
         elif args.hf_kind == "laravel":
             output = laravel_output
         else:
             output = instruction_output
+        kind = "qa" if args.hf_kind == "reasoning" else args.hf_kind
         stats.append(
             mine_hf_dataset(
                 source,
                 output,
-                kind=args.hf_kind,
+                kind=kind,
                 config_name=args.hf_config,
                 split=args.hf_split,
                 max_items=args.max_items,

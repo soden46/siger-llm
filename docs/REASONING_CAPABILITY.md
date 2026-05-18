@@ -82,6 +82,8 @@ python tools/build_instruction_corpus.py --registry configs/datasets/indonesian_
 python lora/run_lora.py --config configs/training/indonesian_hf_mix_plus_kaggle_reasoning_lora.json
 ```
 
+GPT/Claude distillation and CC BY-SA sources were removed from the project for commercial-safety. Keep `--max-thinking-chars` conservative for any future reviewed reasoning sources so long traces do not dominate the context window.
+
 Existing miners and corpus builders can also emit CoT-formatted rows:
 
 ```bash

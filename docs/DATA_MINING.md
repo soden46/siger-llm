@@ -29,9 +29,8 @@ Q&A Bahasa Indonesia:
 General instruction:
 
 - `togethercomputer/MoAA-SFT`
-- `FreedomIntelligence/alpaca-gpt4-indonesian`
-- `FreedomIntelligence/evol-instruct-indonesian`
-- `Iftitahu/indonesian_instruct_stories`
+- `Iftitahu/indonesian_instruct_stories` jika akses gated disetujui
+- `QuixiAI/dolphin` (`flan1m-alpaca-uncensored`, Apache 2.0)
 
 Code / HumanEval:
 
@@ -43,6 +42,24 @@ Semua source code umum digabung ke:
 ```txt
 data/mined/instruction/code_instruction.jsonl
 ```
+
+Commercial-safe reasoning / synthetic education:
+
+- `microsoft/orca-math-word-problems-200k` (MIT)
+- `openbmb/UltraInteract_pair` (MIT)
+- `HuggingFaceTB/cosmopedia` (`stories`, Apache 2.0)
+- `xTayyub/High-Quality-Synthetic-Python-Dataset-with-Reasoning-Traces-Chain-of-Thought-for-LLM-Fine-Tuning` (Apache 2.0)
+
+Semua source reasoning komersial-safe digabung ke:
+
+```txt
+data/mined/instruction/commercial_safe_reasoning_instruction.jsonl
+```
+
+Tidak dimasukkan karena provenance/distillation masih abu-abu untuk target profit:
+
+- `AlicanKiraz0/Agentic-Chain-of-Thought-Coding-SFT-Dataset-v1.1`
+- `ssbuild/alaca_chain-of-thought`
 
 Laravel:
 
@@ -76,17 +93,12 @@ Indonesian HF mix untuk eksperimen Kaggle:
 - `morissu/indonesian_corpus` sebagai raw text / text completion
 - `IndonesiaAI/translated-samples` sebagai translation
 - `kaitchup/opus-Indonesian-to-English` sebagai translation
-- `Ichsan2895/alpaca-gpt4-indonesian` sebagai instruction
-- `AnnasBlackHat/alpaca-indonesia-llama` sebagai instruction
 - `ermandmand/indonesian-simple-instruction-dataset` sebagai instruction sederhana
 - `IndonesiaAI/sft-dataset` sebagai SFT/instruction
 - `audichandra/bitext_customer_support_llm_dataset_indonesian` sebagai customer support instruction
 - `LorthGyu/indonesian-qa` sebagai Q&A Bahasa Indonesia
 - `theonlydo/indonesia-slang` sebagai slang/vocabulary
 - `nahiar/indonesia-slang` sebagai slang/vocabulary
-- `arihadilahhasan/quran_terjemah_indonesia` sebagai raw text / text completion
-
-Catatan: `arihadilahhasan/quran_terjemah_indonesia` pernah muncul dobel di daftar eksperimen, tetapi cukup dimining satu kali.
 
 ## 2. Install Dependency Tambahan
 
@@ -325,7 +337,7 @@ Untuk LoRA general assistant, arahkan config training ke corpus ini atau tambahk
 Untuk Indonesian HF mix:
 
 ```powershell
-python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix.json
+python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix.json --max-row-tokens 2048
 ```
 
 Output corpus:
@@ -337,7 +349,7 @@ data/corpus/indonesian_hf_mix_train.jsonl
 Untuk Indonesian HF mix + Kaggle Add Input:
 
 ```powershell
-python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix_plus_kaggle.json
+python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix_plus_kaggle.json --max-row-tokens 2048
 ```
 
 Output corpus:
@@ -354,6 +366,7 @@ Untuk tahap awal general assistant:
 Q&A Indonesia          weight 2
 Laravel docs/tutorial  weight 2
 Code/HumanEval         weight 1
+Commercial-safe reasoning weight 1
 General instruction    weight 1
 Lampung domain         weight 1
 ```
@@ -363,6 +376,7 @@ Alasannya:
 - Q&A melatih model menjawab berdasarkan konteks.
 - Laravel docs/tutorial memberi kemampuan domain coding yang konkret.
 - Code/HumanEval memberi latihan problem solving dan penyelesaian fungsi teruji.
+- Commercial-safe reasoning memberi latihan matematika, coding, dan penalaran sintetis yang lisensinya lebih aman untuk target profit.
 - General instruction menjaga gaya assistant umum.
 - Lampung tetap ada sebagai kemampuan lokal, tetapi tidak mendominasi general assistant.
 
@@ -375,6 +389,34 @@ Sebelum training serius:
 3. Pastikan jawaban Q&A tidak kehilangan konteks.
 4. Pisahkan eval set kecil untuk Q&A dan Laravel.
 5. Jangan mencampur data berlisensi ketat ke release publik tanpa review lisensi.
+
+`tools/build_instruction_corpus.py` sudah punya quality gate default:
+
+- deduplikasi lintas source setelah semua data digabung,
+- filter row terlalu panjang dengan `--max-row-tokens` default `2048`,
+- sanity check ringan untuk row Laravel/PHP, termasuk code fence yang belum tertutup dan snippet `?>` tanpa `<?php`,
+- report JSON otomatis di samping output corpus, misalnya `data/corpus/general_assistant_mining_train.report.json`.
+
+Untuk model kecil 11.8M parameter, gunakan batas aman:
+
+```powershell
+python tools\build_instruction_corpus.py --registry configs\datasets\general_assistant_mining.json --max-row-tokens 2048
+```
+
+Kalau ingin smoke test lebih ketat:
+
+```powershell
+python tools\build_instruction_corpus.py --registry configs\datasets\general_assistant_mining.json --max-row-tokens 1024
+```
+
+Di Kaggle, pantau disk sebelum mining besar:
+
+```bash
+du -sh data data/mined data/corpus checkpoints 2>/dev/null || true
+df -h /kaggle/working
+```
+
+Untuk `mine_indonesian_hf_mix.py`, hindari langsung `--max-items-per-source 50000` kalau disk mulai mepet. Naikkan bertahap dari `200`, `5000`, `10000`, lalu baru `50000`.
 
 Contoh inspeksi cepat:
 

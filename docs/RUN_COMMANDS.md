@@ -104,27 +104,33 @@ python tools\build_instruction_dataset.py
 Lampung-only corpus:
 
 ```powershell
-python tools\build_instruction_corpus.py --registry configs\datasets\lampung_instruction.json
+python tools\build_instruction_corpus.py --registry configs\datasets\lampung_instruction.json --max-row-tokens 2048
 ```
 
 General corpus lama:
 
 ```powershell
-python tools\build_instruction_corpus.py --registry configs\datasets\general_instruction.json
+python tools\build_instruction_corpus.py --registry configs\datasets\general_instruction.json --max-row-tokens 2048
 ```
 
 General assistant mining corpus:
 
 ```powershell
-python tools\build_instruction_corpus.py --registry configs\datasets\general_assistant_mining.json
+python tools\build_instruction_corpus.py --registry configs\datasets\general_assistant_mining.json --max-row-tokens 2048
 ```
 
-## 7. Mining Q&A dan Laravel
+## 7. Mining Q&A, Reasoning, Code, dan Laravel
 
 Smoke kecil dulu:
 
 ```powershell
 python tools\mine_general_assistant_data.py --preset all --max-items 200 --max-laravel-pages 5 --max-santrikoding-articles 10
+```
+
+Commercial-safe reasoning saja:
+
+```powershell
+python tools\mine_general_assistant_data.py --preset reasoning --max-items 2000
 ```
 
 Q&A Indonesia saja:
@@ -148,7 +154,7 @@ python tools\mine_general_assistant_data.py --preset qa --local-qa-file data\ext
 Build corpus setelah mining:
 
 ```powershell
-python tools\build_instruction_corpus.py --registry configs\datasets\general_assistant_mining.json
+python tools\build_instruction_corpus.py --registry configs\datasets\general_assistant_mining.json --max-row-tokens 2048
 ```
 
 ## 8. Mining Indonesian HF Mix di Kaggle
@@ -182,40 +188,40 @@ python tools/ingest_kaggle_inputs.py
 Build corpus instruction:
 
 ```bash
-python tools/build_instruction_corpus.py --registry configs/datasets/indonesian_hf_mix.json
+python tools/build_instruction_corpus.py --registry configs/datasets/indonesian_hf_mix.json --max-row-tokens 2048
 ```
 
 Build corpus instruction dengan CoT conversion dari registry apa pun:
 
 ```bash
-python tools/build_instruction_corpus.py --registry configs/datasets/indonesian_hf_mix.json --cot-ratio 0.25
+python tools/build_instruction_corpus.py --registry configs/datasets/indonesian_hf_mix.json --cot-ratio 0.25 --max-row-tokens 2048
 ```
 
 Build corpus HF mix + Kaggle Add Input:
 
 ```bash
-python tools/build_instruction_corpus.py --registry configs/datasets/indonesian_hf_mix_plus_kaggle.json
+python tools/build_instruction_corpus.py --registry configs/datasets/indonesian_hf_mix_plus_kaggle.json --max-row-tokens 2048
 ```
 
 Build software engineering capability seed:
 
 ```bash
 python tools/build_software_engineering_seed.py
-python tools/build_instruction_corpus.py --registry configs/datasets/software_engineering_instruction.json
+python tools/build_instruction_corpus.py --registry configs/datasets/software_engineering_instruction.json --max-row-tokens 2048
 ```
 
 Build reasoning / Chain-of-Thought seed:
 
 ```bash
 python tools/build_reasoning_seed.py
-python tools/build_instruction_corpus.py --registry configs/datasets/reasoning_instruction.json
+python tools/build_instruction_corpus.py --registry configs/datasets/reasoning_instruction.json --max-row-tokens 2048
 ```
 
 Build HF mix + Kaggle + Lampung + software engineering capability:
 
 ```bash
 python tools/build_software_engineering_seed.py
-python tools/build_instruction_corpus.py --registry configs/datasets/indonesian_hf_mix_plus_kaggle_software.json
+python tools/build_instruction_corpus.py --registry configs/datasets/indonesian_hf_mix_plus_kaggle_software.json --max-row-tokens 2048
 ```
 
 Build HF mix + Kaggle + Lampung + reasoning + software engineering:
@@ -223,7 +229,7 @@ Build HF mix + Kaggle + Lampung + reasoning + software engineering:
 ```bash
 python tools/build_software_engineering_seed.py
 python tools/build_reasoning_seed.py
-python tools/build_instruction_corpus.py --registry configs/datasets/indonesian_hf_mix_plus_kaggle_reasoning.json
+python tools/build_instruction_corpus.py --registry configs/datasets/indonesian_hf_mix_plus_kaggle_reasoning.json --max-row-tokens 2048
 ```
 
 Output penting:
@@ -238,33 +244,46 @@ data/kaggle/kaggle_extra_instruction.jsonl
 
 `data/indonesian_hf_mix.txt` otomatis bisa ikut base training karena `main.py` membaca semua file `.txt` di `data/`.
 
+Quality report dibuat otomatis di samping corpus, misalnya:
+
+```txt
+data/corpus/indonesian_hf_mix_plus_kaggle_train.report.json
+```
+
+Pantau disk Kaggle sebelum mining besar:
+
+```bash
+du -sh data data/mined data/corpus checkpoints 2>/dev/null || true
+df -h /kaggle/working
+```
+
 ## 9. LoRA Training
 
 Lampung-only LoRA:
 
 ```powershell
-python tools\build_instruction_corpus.py --registry configs\datasets\lampung_instruction.json
+python tools\build_instruction_corpus.py --registry configs\datasets\lampung_instruction.json --max-row-tokens 2048
 python lora\run_lora.py --config configs\training\lampung_lora.json
 ```
 
 General LoRA:
 
 ```powershell
-python tools\build_instruction_corpus.py --registry configs\datasets\general_instruction.json
+python tools\build_instruction_corpus.py --registry configs\datasets\general_instruction.json --max-row-tokens 2048
 python lora\run_lora.py --config configs\training\general_lora.json
 ```
 
 Indonesian HF mix LoRA:
 
 ```powershell
-python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix.json
+python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix.json --max-row-tokens 2048
 python lora\run_lora.py --config configs\training\indonesian_hf_mix_lora.json
 ```
 
 Indonesian HF mix + Kaggle Add Input LoRA:
 
 ```powershell
-python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix_plus_kaggle.json
+python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix_plus_kaggle.json --max-row-tokens 2048
 python lora\run_lora.py --config configs\training\indonesian_hf_mix_plus_kaggle_lora.json
 ```
 
@@ -272,7 +291,7 @@ Software engineering capability LoRA:
 
 ```powershell
 python tools\build_software_engineering_seed.py
-python tools\build_instruction_corpus.py --registry configs\datasets\software_engineering_instruction.json
+python tools\build_instruction_corpus.py --registry configs\datasets\software_engineering_instruction.json --max-row-tokens 2048
 python lora\run_lora.py --config configs\training\software_engineering_lora.json
 ```
 
@@ -280,7 +299,7 @@ Reasoning / Chain-of-Thought LoRA:
 
 ```powershell
 python tools\build_reasoning_seed.py
-python tools\build_instruction_corpus.py --registry configs\datasets\reasoning_instruction.json
+python tools\build_instruction_corpus.py --registry configs\datasets\reasoning_instruction.json --max-row-tokens 2048
 python lora\run_lora.py --config configs\training\reasoning_lora.json
 ```
 
@@ -289,7 +308,7 @@ Indonesian HF mix + Kaggle + Lampung + reasoning LoRA:
 ```powershell
 python tools\build_software_engineering_seed.py
 python tools\build_reasoning_seed.py
-python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix_plus_kaggle_reasoning.json
+python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix_plus_kaggle_reasoning.json --max-row-tokens 2048
 python lora\run_lora.py --config configs\training\indonesian_hf_mix_plus_kaggle_reasoning_lora.json
 ```
 

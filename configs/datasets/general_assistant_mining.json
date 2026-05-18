@@ -34,6 +34,17 @@
       }
     },
     {
+      "name": "commercial_safe_reasoning_instruction",
+      "path": "data/mined/instruction/commercial_safe_reasoning_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "max_items": 10000,
+      "system_prompt": "Kamu adalah SigerLM, asisten penalaran komersial-safe yang menyelesaikan soal matematika, coding, dan teks edukatif dengan runtut.",
+      "metadata": {
+        "type": "commercial_safe_reasoning"
+      }
+    },
+    {
       "name": "laravel_instruction",
       "path": "data/mined/instruction/laravel_instruction.jsonl",
       "format": "instruction_jsonl",

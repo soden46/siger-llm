@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import random
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,74 @@ DEFAULT_SYSTEM_PROMPT = (
 
 def normalize_text(value: Any) -> str:
     return " ".join(str(value or "").strip().split())
+
+
+def row_text(row: dict[str, Any]) -> str:
+    return "\n".join(
+        normalize_text(row.get(field))
+        for field in ("system", "instruction", "input", "output")
+        if normalize_text(row.get(field))
+    )
+
+
+def rough_token_count(text: str) -> int:
+    text = normalize_text(text)
+    if not text:
+        return 0
+    word_like = len(re.findall(r"\w+|[^\w\s]", text, flags=re.UNICODE))
+    byte_like = max(1, len(text) // 4)
+    return max(word_like, byte_like)
+
+
+def row_token_count(row: dict[str, Any]) -> int:
+    return rough_token_count(row_text(row))
+
+
+def dedupe_fingerprint(row: dict[str, Any]) -> str:
+    text = row_text(row).lower()
+    text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"[^\w\s<>/]+", "", text, flags=re.UNICODE)
+    return text[:20000]
+
+
+def is_laravel_row(row: dict[str, Any]) -> bool:
+    source = normalize_text(row.get("source")).lower()
+    task_type = normalize_text(row.get("type")).lower()
+    content = row_text(row).lower()
+    return (
+        "laravel" in source
+        or "laravel" in task_type
+        or "santrikoding" in source
+        or "<?php" in content
+        or "artisan" in content
+    )
+
+
+def repair_markdown_fences(text: str) -> tuple[str, bool]:
+    if text.count("```") % 2 == 0:
+        return text, False
+    return text.rstrip() + "\n```", True
+
+
+def sanitize_laravel_php(row: dict[str, Any]) -> tuple[dict[str, Any] | None, dict[str, int]]:
+    stats = {"laravel_fences_repaired": 0, "laravel_php_malformed": 0}
+    if not is_laravel_row(row):
+        return row, stats
+
+    fixed = dict(row)
+    for field in ("instruction", "input", "output"):
+        value = normalize_text(fixed.get(field))
+        if not value:
+            continue
+        if "?>" in value and "<?php" not in value:
+            stats["laravel_php_malformed"] += 1
+            return None, stats
+        repaired, did_repair = repair_markdown_fences(value)
+        if did_repair:
+            fixed[field] = repaired
+            stats["laravel_fences_repaired"] += 1
+
+    return fixed, stats
 
 
 def instruction_row(
@@ -174,22 +243,104 @@ def convert_source(source: DatasetSource) -> list[dict[str, Any]]:
     return weighted
 
 
-def dedupe(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    seen: set[tuple[str, str, str]] = set()
-    deduped: list[dict[str, Any]] = []
+def filter_quality(
+    rows: list[dict[str, Any]],
+    *,
+    max_row_tokens: int = 2048,
+    strict_laravel_php: bool = True,
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    stats = {
+        "filtered_too_long": 0,
+        "filtered_laravel_php_malformed": 0,
+        "laravel_fences_repaired": 0,
+    }
+    filtered: list[dict[str, Any]] = []
 
     for row in rows:
-        key = (
-            normalize_text(row.get("instruction")).lower(),
-            normalize_text(row.get("input")).lower(),
-            normalize_text(row.get("output")).lower(),
-        )
+        if max_row_tokens > 0 and row_token_count(row) > max_row_tokens:
+            stats["filtered_too_long"] += 1
+            continue
+
+        if strict_laravel_php:
+            sanitized, php_stats = sanitize_laravel_php(row)
+            stats["filtered_laravel_php_malformed"] += php_stats["laravel_php_malformed"]
+            stats["laravel_fences_repaired"] += php_stats["laravel_fences_repaired"]
+            if sanitized is None:
+                continue
+            row = sanitized
+
+        filtered.append(row)
+
+    return filtered, stats
+
+
+def dedupe_with_report(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
+    seen: set[str] = set()
+    deduped: list[dict[str, Any]] = []
+    duplicates = 0
+
+    for row in rows:
+        key = dedupe_fingerprint(row)
         if key in seen:
+            duplicates += 1
             continue
         seen.add(key)
         deduped.append(row)
 
+    return deduped, duplicates
+
+
+def dedupe(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    deduped, _ = dedupe_with_report(rows)
     return deduped
+
+
+def build_corpus_with_report(
+    registry: DatasetRegistry,
+    *,
+    cot_ratio: float = 0.0,
+    cot_mode: str = "auto",
+    max_row_tokens: int = 2048,
+    strict_laravel_php: bool = True,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    report: dict[str, Any] = {
+        "registry": registry.name,
+        "output_path": str(registry.output_path),
+        "max_row_tokens": max_row_tokens,
+        "strict_laravel_php": strict_laravel_php,
+        "sources": [],
+    }
+    for source in registry.sources:
+        source_rows = convert_source(source)
+        report["sources"].append(
+            {
+                "name": source.name,
+                "format": source.format,
+                "weight": source.weight,
+                "rows_after_weight": len(source_rows),
+            }
+        )
+        rows.extend(source_rows)
+
+    if cot_ratio > 0:
+        rows = [maybe_apply_cot(row, ratio=cot_ratio, mode=cot_mode) for row in rows]
+
+    report["rows_before_quality"] = len(rows)
+    rows, quality_stats = filter_quality(
+        rows,
+        max_row_tokens=max_row_tokens,
+        strict_laravel_php=strict_laravel_php,
+    )
+    report.update(quality_stats)
+    report["rows_after_quality"] = len(rows)
+
+    rows, duplicates_removed = dedupe_with_report(rows)
+    report["duplicates_removed"] = duplicates_removed
+    report["rows_after_dedupe"] = len(rows)
+
+    random.Random(registry.shuffle_seed).shuffle(rows)
+    return rows, report
 
 
 def build_corpus(
@@ -197,16 +348,16 @@ def build_corpus(
     *,
     cot_ratio: float = 0.0,
     cot_mode: str = "auto",
+    max_row_tokens: int = 2048,
+    strict_laravel_php: bool = True,
 ) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
-    for source in registry.sources:
-        rows.extend(convert_source(source))
-
-    if cot_ratio > 0:
-        rows = [maybe_apply_cot(row, ratio=cot_ratio, mode=cot_mode) for row in rows]
-
-    rows = dedupe(rows)
-    random.Random(registry.shuffle_seed).shuffle(rows)
+    rows, _ = build_corpus_with_report(
+        registry,
+        cot_ratio=cot_ratio,
+        cot_mode=cot_mode,
+        max_row_tokens=max_row_tokens,
+        strict_laravel_php=strict_laravel_php,
+    )
     return rows
 
 
@@ -217,6 +368,12 @@ def write_jsonl(path: str | Path, rows: list[dict[str, Any]]) -> None:
     with output_path.open("w", encoding="utf-8") as f:
         for row in rows:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def write_report(path: str | Path, report: dict[str, Any]) -> None:
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def main() -> None:
@@ -238,15 +395,46 @@ def main() -> None:
         default="auto",
         help="CoT reasoning template style.",
     )
+    parser.add_argument(
+        "--max-row-tokens",
+        type=int,
+        default=2048,
+        help="Drop rows whose rough token count exceeds this value. Use 0 to disable.",
+    )
+    parser.add_argument(
+        "--skip-laravel-php-check",
+        action="store_true",
+        help="Disable lightweight Laravel/PHP snippet sanity checks.",
+    )
+    parser.add_argument(
+        "--quality-report",
+        default=None,
+        help="Optional output path for corpus quality report JSON.",
+    )
     args = parser.parse_args()
 
     registry = DatasetRegistry.from_json(args.registry)
-    rows = build_corpus(registry, cot_ratio=args.cot_ratio, cot_mode=args.cot_mode)
+    rows, report = build_corpus_with_report(
+        registry,
+        cot_ratio=args.cot_ratio,
+        cot_mode=args.cot_mode,
+        max_row_tokens=args.max_row_tokens,
+        strict_laravel_php=not args.skip_laravel_php_check,
+    )
     write_jsonl(registry.output_path, rows)
+    report_path = args.quality_report or str(Path(registry.output_path).with_suffix(".report.json"))
+    write_report(report_path, report)
 
     print(f"\nBuilt corpus: {registry.name}")
     print(f"Rows: {len(rows)}")
     print(f"Output: {registry.output_path}")
+    print(f"Quality report: {report_path}")
+    if report["filtered_too_long"] or report["duplicates_removed"]:
+        print(
+            "Quality gate: "
+            f"filtered_too_long={report['filtered_too_long']}, "
+            f"duplicates_removed={report['duplicates_removed']}"
+        )
 
 
 if __name__ == "__main__":
