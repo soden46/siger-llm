@@ -1,6 +1,6 @@
-# DATA_MINING.md - Mining Dataset Q&A dan Laravel untuk SigerLM
+# DATA_MINING.md - Mining Dataset Q&A, Code, dan Laravel untuk SigerLM
 
-Dokumen ini menjelaskan cara mengubah dataset Q&A Bahasa Indonesia, instruction dataset, dokumentasi Laravel, dan tutorial Laravel menjadi format yang bisa dibaca pipeline SigerLM.
+Dokumen ini menjelaskan cara mengubah dataset Q&A Bahasa Indonesia, instruction dataset, code evaluation, dokumentasi Laravel, dan tutorial Laravel menjadi format yang bisa dibaca pipeline SigerLM.
 
 Output akhirnya adalah JSONL instruction row:
 
@@ -33,10 +33,36 @@ General instruction:
 - `FreedomIntelligence/evol-instruct-indonesian`
 - `Iftitahu/indonesian_instruct_stories`
 
+Code / HumanEval:
+
+- `openai/openai_humaneval`
+- `loubnabnl/humaneval_infilling`
+
+Semua source code umum digabung ke:
+
+```txt
+data/mined/instruction/code_instruction.jsonl
+```
+
 Laravel:
 
 - Laravel official docs `9.x`, `10.x`, `11.x`, `12.x`, `13.x`
 - SantriKoding tag Laravel, difilter hanya artikel yang menyebut Laravel 9 sampai 13
+- `nqhung97/docs-laravel-v13`
+- `fchis/laravel-buildspec-training`
+- `fchis/Laravel-13x-Planner-Instructions`
+- `fchis/Laravel-13x-Code-Instructions`
+- `patelakshay3943/laravel12-dataset-cp`
+- `patelakshay3943/laravel12-dataset`
+- `brijmansuriya/web-beast-laravel`
+- `codeXpedite/Laravel`
+- `relai-ai/laravel-reasoning`
+
+Semua source Laravel digabung ke satu file agar registry tetap sederhana:
+
+```txt
+data/mined/instruction/laravel_instruction.jsonl
+```
 
 Catatan: link `fchis/Laravel-13x-Qwen2.5-Coder-3B-Instruct-LoRA` dan `yannelli/Laravel-11-Llama-3.2-1B-Instruct-GGUF` adalah model/checkpoint, bukan dataset mentah. Jangan dilatih ulang dari bobot model itu. Untuk data Laravel, pakai official docs, tutorial, dan dataset instruction seperti MoAA-SFT yang punya contoh Laravel.
 
@@ -158,7 +184,23 @@ python tools\mine_general_assistant_data.py --preset laravel --laravel-versions 
 
 SantriKoding difilter dengan marker versi seperti `Laravel 9`, `Laravel 10`, `Laravel 11`, `Laravel 12`, atau `Laravel 13`. Artikel yang tidak jelas versinya tidak dimasukkan.
 
-## 6. Mining Semua Sumber
+Preset `laravel` juga mencoba dataset HuggingFace Laravel yang tercatat di bagian sumber. Semua hasilnya tetap di-merge ke `laravel_instruction.jsonl`.
+
+## 6. Mining Code / HumanEval
+
+```powershell
+python tools\mine_general_assistant_data.py --preset code
+```
+
+Output:
+
+```txt
+data/mined/instruction/code_instruction.jsonl
+```
+
+Tool membaca schema umum seperti `prompt`, `canonical_solution`, `test`, `entry_point`, `completion`, `solution`, `code`, `messages`, dan `conversations`, lalu menormalisasi semuanya ke instruction row SigerLM.
+
+## 7. Mining Semua Sumber
 
 Untuk eksperimen penuh:
 
@@ -178,7 +220,7 @@ Report:
 data/mined/instruction/mining_report.json
 ```
 
-## 6.1 Mining Indonesian HF Mix untuk Kaggle
+## 7.1 Mining Indonesian HF Mix untuk Kaggle
 
 Gunakan tool khusus ini untuk mengambil dataset HF Indonesia campuran secara streaming dan mengubahnya ke format instruction SigerLM:
 
@@ -227,7 +269,7 @@ vocab
 Kalau salah satu dataset gagal load karena schema, akses, atau dependency HF, tool akan mencatat error di report dan lanjut ke dataset berikutnya.
 Report HF mix juga mencatat `sample_keys` untuk membantu memperbaiki source yang menghasilkan `0 rows`.
 
-## 6.2 Ingest Kaggle Add Input Lokal
+## 7.2 Ingest Kaggle Add Input Lokal
 
 Dataset yang ditambahkan dari panel **Add Input** Kaggle tersedia di `/kaggle/input`, tetapi tidak otomatis ikut training. Gunakan tool ini untuk scan file `.txt`, `.csv`, `.json`, dan `.jsonl` lalu mengubahnya menjadi data lokal SigerLM:
 
@@ -264,7 +306,7 @@ Untuk build corpus gabungan HF mix + Kaggle input + Lampung:
 python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix_plus_kaggle.json
 ```
 
-## 7. Build Corpus agar Bisa Dibaca SigerLM
+## 8. Build Corpus agar Bisa Dibaca SigerLM
 
 Setelah file mining tersedia:
 
@@ -304,13 +346,14 @@ Output corpus:
 data/corpus/indonesian_hf_mix_plus_kaggle_train.jsonl
 ```
 
-## 8. Rekomendasi Mixing
+## 9. Rekomendasi Mixing
 
 Untuk tahap awal general assistant:
 
 ```txt
 Q&A Indonesia          weight 2
 Laravel docs/tutorial  weight 2
+Code/HumanEval         weight 1
 General instruction    weight 1
 Lampung domain         weight 1
 ```
@@ -319,10 +362,11 @@ Alasannya:
 
 - Q&A melatih model menjawab berdasarkan konteks.
 - Laravel docs/tutorial memberi kemampuan domain coding yang konkret.
+- Code/HumanEval memberi latihan problem solving dan penyelesaian fungsi teruji.
 - General instruction menjaga gaya assistant umum.
 - Lampung tetap ada sebagai kemampuan lokal, tetapi tidak mendominasi general assistant.
 
-## 9. Quality Gate
+## 10. Quality Gate
 
 Sebelum training serius:
 
@@ -336,6 +380,7 @@ Contoh inspeksi cepat:
 
 ```powershell
 Get-Content data\mined\instruction\indonesian_qa_instruction.jsonl -TotalCount 3
+Get-Content data\mined\instruction\code_instruction.jsonl -TotalCount 3
 Get-Content data\mined\instruction\laravel_instruction.jsonl -TotalCount 3
 ```
 

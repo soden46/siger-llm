@@ -24,6 +24,16 @@
       }
     },
     {
+      "name": "code_instruction",
+      "path": "data/mined/instruction/code_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten programming yang menulis kode benar, aman, teruji, dan mudah dirawat.",
+      "metadata": {
+        "type": "code_instruction"
+      }
+    },
+    {
       "name": "laravel_instruction",
       "path": "data/mined/instruction/laravel_instruction.jsonl",
       "format": "instruction_jsonl",

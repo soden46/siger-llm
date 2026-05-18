@@ -71,7 +71,18 @@ class CheckpointManager:
             path = self.save_dir / meta["latest"]
 
         ckpt = torch.load(path, map_location="cpu")
-        unwrap_model(model).load_state_dict(ckpt["model_state"])
+        raw_model = unwrap_model(model)
+        state = ckpt["model_state"]
+        if "embedding.weight" in state and hasattr(raw_model, "embedding"):
+            ckpt_vocab = state["embedding.weight"].shape[0]
+            model_vocab = raw_model.embedding.weight.shape[0]
+            if ckpt_vocab != model_vocab:
+                raise RuntimeError(
+                    "Checkpoint vocab_size tidak cocok dengan model/tokenizer saat ini: "
+                    f"checkpoint={ckpt_vocab}, model={model_vocab}. "
+                    "Gunakan tokenizer yang sama dengan saat checkpoint dibuat atau retrain base model."
+                )
+        raw_model.load_state_dict(state)
 
         if optimizer and "optimizer_state" in ckpt:
             optimizer.load_state_dict(ckpt["optimizer_state"])

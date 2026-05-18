@@ -50,15 +50,17 @@ def select_precision(device: str, requested: str = "auto") -> str:
     requested = (requested or "auto").lower()
     if device != "cuda" or not torch.cuda.is_available():
         return "fp32"
+    major, _minor = torch.cuda.get_device_capability()
+    bf16_native = major >= 8 and torch.cuda.is_bf16_supported()
     if requested in {"fp16", "float16"}:
         return "fp16"
     if requested in {"bf16", "bfloat16"}:
-        return "bf16" if torch.cuda.is_bf16_supported() else "fp16"
+        return "bf16" if bf16_native else "fp16"
     if requested in {"fp32", "float32", "full"}:
         return "fp32"
     if requested != "auto":
         raise ValueError(f"Unsupported precision: {requested}")
-    return "bf16" if torch.cuda.is_bf16_supported() else "fp16"
+    return "bf16" if bf16_native else "fp16"
 
 
 def amp_dtype_from_plan(plan: RuntimePlan) -> torch.dtype:
@@ -218,6 +220,8 @@ def cleanup_distributed() -> None:
 def unwrap_model(model: nn.Module) -> nn.Module:
     while isinstance(model, (nn.DataParallel, DistributedDataParallel)):
         model = model.module
+    if hasattr(model, "_orig_mod"):
+        model = model._orig_mod
     return model
 
 

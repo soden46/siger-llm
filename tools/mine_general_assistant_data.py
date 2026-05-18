@@ -35,6 +35,10 @@ LARAVEL_SYSTEM_PROMPT = (
     "Kamu adalah SigerLM, asisten programming yang membantu Laravel versi 9 sampai 13. "
     "Jawab praktis, akurat, dan sebutkan versi Laravel jika relevan."
 )
+CODE_SYSTEM_PROMPT = (
+    "Kamu adalah SigerLM, asisten programming yang menulis kode benar, aman, "
+    "teruji, dan mudah dirawat. Jelaskan asumsi penting jika relevan."
+)
 
 HF_QA_SOURCES = ["SEACrowd/indoqa"]
 LARGE_HF_QA_SOURCES = ["SEACrowd/tydiqa_id"]
@@ -44,6 +48,21 @@ HF_INSTRUCTION_SOURCES = [
     "FreedomIntelligence/evol-instruct-indonesian",
 ]
 GATED_HF_INSTRUCTION_SOURCES = ["Iftitahu/indonesian_instruct_stories"]
+HF_CODE_EVAL_SOURCES = [
+    "openai/openai_humaneval",
+    "loubnabnl/humaneval_infilling",
+]
+HF_LARAVEL_DATASET_SOURCES = [
+    "nqhung97/docs-laravel-v13",
+    "fchis/laravel-buildspec-training",
+    "fchis/Laravel-13x-Planner-Instructions",
+    "fchis/Laravel-13x-Code-Instructions",
+    "patelakshay3943/laravel12-dataset-cp",
+    "patelakshay3943/laravel12-dataset",
+    "brijmansuriya/web-beast-laravel",
+    "codeXpedite/Laravel",
+    "relai-ai/laravel-reasoning",
+]
 
 
 @dataclass(frozen=True)
@@ -227,6 +246,116 @@ def row_to_instruction(row: dict[str, Any], source_name: str) -> list[dict[str, 
     return [built] if built else []
 
 
+def row_to_code_instruction(row: dict[str, Any], source_name: str, *, laravel: bool = False) -> list[dict[str, Any]]:
+    for key in ["messages", "conversations"]:
+        if key in row:
+            rows = messages_to_instruction(row[key], source_name)
+            if rows:
+                system_prompt = LARAVEL_SYSTEM_PROMPT if laravel else CODE_SYSTEM_PROMPT
+                task_type = "laravel_instruction" if laravel else "code_instruction"
+                for item in rows:
+                    item["system"] = system_prompt
+                    item["type"] = task_type
+                return rows
+
+    prompt = clean_text(
+        first_value(
+            row,
+            [
+                "prompt",
+                "instruction",
+                "question",
+                "task",
+                "problem",
+                "description",
+                "spec",
+                "buildspec",
+                "request",
+                "input",
+                "text",
+                "content",
+                "doc",
+                "documentation",
+            ],
+        )
+        or ""
+    )
+    context = clean_text(
+        first_value(
+            row,
+            [
+                "context",
+                "input",
+                "starter_code",
+                "declaration",
+                "signature",
+                "imports",
+                "prefix",
+                "before",
+                "source",
+            ],
+        )
+        or ""
+    )
+    output = clean_text(
+        first_value(
+            row,
+            [
+                "output",
+                "response",
+                "answer",
+                "completion",
+                "canonical_solution",
+                "solution",
+                "code",
+                "target",
+                "accepted_answer",
+                "suffix",
+                "after",
+            ],
+        )
+        or ""
+    )
+    tests = clean_text(first_value(row, ["test", "tests", "unit_tests", "example_test"]) or "")
+    entry_point = normalize_text(first_value(row, ["entry_point", "function_name", "name"]) or "")
+
+    if not prompt and context:
+        prompt, context = context, ""
+    if not output:
+        return []
+
+    input_parts: list[str] = []
+    if context and context != prompt:
+        input_parts.append(context)
+    if tests:
+        input_parts.append(f"Tests:\n{tests}")
+    if entry_point:
+        input_parts.append(f"Entry point: {entry_point}")
+
+    if "humaneval" in source_name.lower():
+        instruction = "Lengkapi fungsi Python berikut agar lolos unit test."
+        input_text = "\n\n".join(part for part in [prompt, *input_parts] if part)
+        task_type = "code_humaneval"
+    elif laravel:
+        instruction = prompt or "Buat solusi Laravel sesuai spesifikasi berikut."
+        input_text = "\n\n".join(input_parts)
+        task_type = "laravel_instruction"
+    else:
+        instruction = prompt or "Selesaikan tugas pemrograman berikut."
+        input_text = "\n\n".join(input_parts)
+        task_type = "code_instruction"
+
+    built = instruction_row(
+        instruction,
+        output,
+        input_text=input_text,
+        system_prompt=LARAVEL_SYSTEM_PROMPT if laravel else CODE_SYSTEM_PROMPT,
+        source=source_name,
+        task_type=task_type,
+    )
+    return [built] if built else []
+
+
 def iter_hf_rows(dataset_name: str, *, config_name: str | None = None, split: str | None = None):
     try:
         from datasets import DatasetDict, __version__ as datasets_version, load_dataset
@@ -287,6 +416,10 @@ def mine_hf_dataset(
                     rows.append(converted)
             elif kind == "instruction":
                 rows.extend(row_to_instruction(raw, source_name))
+            elif kind == "code":
+                rows.extend(row_to_code_instruction(raw, source_name, laravel=False))
+            elif kind == "laravel":
+                rows.extend(row_to_code_instruction(raw, source_name, laravel=True))
             else:
                 raise ValueError(f"Unsupported HF mining kind: {kind}")
 
@@ -580,12 +713,12 @@ def write_report(path: Path, stats: list[MineStats]) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Mine Q&A, instruction, and Laravel sources into instruction JSONL.")
-    parser.add_argument("--preset", choices=["all", "qa", "instruction", "laravel"], default="all")
+    parser = argparse.ArgumentParser(description="Mine Q&A, instruction, code, and Laravel sources into instruction JSONL.")
+    parser.add_argument("--preset", choices=["all", "qa", "instruction", "code", "laravel"], default="all")
     parser.add_argument("--output-dir", default="data/mined/instruction")
     parser.add_argument("--max-items", type=int, default=None, help="Limit rows per HF/local source.")
     parser.add_argument("--hf-source", action="append", default=[], help="Extra HF dataset name.")
-    parser.add_argument("--hf-kind", choices=["qa", "instruction"], default="instruction")
+    parser.add_argument("--hf-kind", choices=["qa", "instruction", "code", "laravel"], default="instruction")
     parser.add_argument("--hf-config", default=None)
     parser.add_argument("--hf-split", default=None)
     parser.add_argument(
@@ -615,12 +748,13 @@ def main() -> None:
     output_dir = Path(args.output_dir)
     qa_output = output_dir / "indonesian_qa_instruction.jsonl"
     instruction_output = output_dir / "indonesian_general_instruction.jsonl"
+    code_output = output_dir / "code_instruction.jsonl"
     laravel_output = output_dir / "laravel_instruction.jsonl"
     report_output = output_dir / "mining_report.json"
     stats: list[MineStats] = []
 
-    reset_outputs([qa_output, instruction_output, laravel_output])
-    for output_path in [qa_output, instruction_output, laravel_output]:
+    reset_outputs([qa_output, instruction_output, code_output, laravel_output])
+    for output_path in [qa_output, instruction_output, code_output, laravel_output]:
         touch_jsonl(output_path)
 
     if args.preset in {"all", "qa"}:
@@ -639,8 +773,28 @@ def main() -> None:
         for source in instruction_sources:
             stats.append(mine_hf_dataset(source, instruction_output, kind="instruction", max_items=args.max_items, cot_ratio=args.cot_ratio, cot_mode=args.cot_mode))
 
+    if args.preset in {"all", "code"}:
+        for source in HF_CODE_EVAL_SOURCES:
+            stats.append(
+                mine_hf_dataset(
+                    source,
+                    code_output,
+                    kind="code",
+                    max_items=args.max_items,
+                    cot_ratio=args.cot_ratio,
+                    cot_mode=args.cot_mode,
+                )
+            )
+
     for source in args.hf_source:
-        output = qa_output if args.hf_kind == "qa" else instruction_output
+        if args.hf_kind == "qa":
+            output = qa_output
+        elif args.hf_kind == "code":
+            output = code_output
+        elif args.hf_kind == "laravel":
+            output = laravel_output
+        else:
+            output = instruction_output
         stats.append(
             mine_hf_dataset(
                 source,
@@ -655,6 +809,17 @@ def main() -> None:
         )
 
     if args.preset in {"all", "laravel"}:
+        for source in HF_LARAVEL_DATASET_SOURCES:
+            stats.append(
+                mine_hf_dataset(
+                    source,
+                    laravel_output,
+                    kind="laravel",
+                    max_items=args.max_items,
+                    cot_ratio=args.cot_ratio,
+                    cot_mode=args.cot_mode,
+                )
+            )
         stats.append(
             mine_laravel_docs(
                 laravel_output,

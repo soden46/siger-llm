@@ -72,12 +72,19 @@ class LoRATrainer:
 
         if config.auto_tune_batch_vram:
             base_batch = int(config.batch_size)
-            d_model = int(getattr(getattr(lora_model.base_model, "config", None), "d_model", 256))
+            base_config = getattr(lora_model.base_model, "config", None)
+            d_model = int(getattr(base_config, "d_model", 256))
+            d_inner = int(getattr(base_config, "d_inner", d_model * int(getattr(base_config, "expand", 2))))
+            d_state = int(getattr(base_config, "d_state", 16))
+            n_layers = int(getattr(base_config, "n_layers", 1))
             tuned_batch = suggest_cuda_batch_size(
                 base_batch_size=base_batch,
                 max_batch_size=int(config.max_global_batch_size),
                 max_seq_len=int(config.max_seq_len),
                 d_model=d_model,
+                d_inner=d_inner,
+                d_state=d_state,
+                n_layers=n_layers,
                 safety_fraction=float(config.vram_safety_fraction),
             )
             if tuned_batch > base_batch:
@@ -136,8 +143,9 @@ class LoRATrainer:
         step = 0
         tokens_since_step = 0
         last_step_time = time.time()
-        self.optimizer.zero_grad()
-        device_type = "cuda" if self.device == "cuda" else "cpu"
+        self.optimizer.zero_grad(set_to_none=True)
+        device_str = str(self.device)
+        device_type = "cuda" if "cuda" in device_str else "cpu"
         scaler = torch.amp.GradScaler(
             device_type,
             enabled=(device_type == "cuda" and self.runtime.precision == "fp16"),
@@ -187,7 +195,7 @@ class LoRATrainer:
                     )
                     scaler.step(self.optimizer)
                     scaler.update()
-                    self.optimizer.zero_grad()
+                    self.optimizer.zero_grad(set_to_none=True)
                     lr = self.scheduler.step()
 
                     now = time.time()

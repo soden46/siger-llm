@@ -31,6 +31,9 @@ TRAIN_CONFIG = {
     "vocab_size": 100271,
     "d_model": 256,
     "n_layers": 8,
+    "d_state": 16,
+    "expand": 2,
+    "d_conv": 4,
     "activation": "silu",
     "norm_type": "rmsnorm",
     "norm_eps": 1e-6,
@@ -47,12 +50,13 @@ TRAIN_CONFIG = {
 
     # Training kecil
     "max_steps": 1500,
-    "batch_size": 32,
+    "batch_size": 16,
     "auto_scale_batch": True,
     "max_auto_scale_factor": 2,
-    "max_global_batch_size": 128,
+    "max_global_batch_size": 64,
+    "max_per_device_batch_size": 16,
     "max_seq_len": 128 ,
-    "grad_accum_steps": 2,
+    "grad_accum_steps": 4,
     "max_chars_per_text_file": 8_000_000,
     "max_dataset_chunks": 200_000,
     "text_sources": ["data"],
@@ -73,6 +77,8 @@ TRAIN_CONFIG = {
     "elastic_recovery": True,
     "auto_tune_batch_vram": True,
     "vram_safety_fraction": 0.75,
+    "torch_compile": False,
+    "torch_compile_mode": "reduce-overhead",
 
     # Optimizer
     # "max_lr":        3e-4,
@@ -120,6 +126,7 @@ def main():
     # 1. Tokenizer
     tok = build_tokenizer("auto")
     print(f"Tokenizer backend: {tok.backend} | vocab_size={tok.vocab_size}")
+    TRAIN_CONFIG["vocab_size"] = tok.vocab_size
 
     # 2. Dataset sources
     text_paths = resolve_text_sources(TRAIN_CONFIG)
@@ -151,9 +158,12 @@ def main():
 
     # 3. Model
     model_config = SigerConfig(
-        vocab_size=tok.vocab_size,
+        vocab_size=TRAIN_CONFIG["vocab_size"],
         d_model=TRAIN_CONFIG["d_model"],
         n_layers=TRAIN_CONFIG["n_layers"],
+        d_state=TRAIN_CONFIG.get("d_state", 16),
+        d_conv=TRAIN_CONFIG.get("d_conv", 4),
+        expand=TRAIN_CONFIG.get("expand", 2),
         max_seq_len=TRAIN_CONFIG["max_seq_len"],
         activation=TRAIN_CONFIG.get("activation", "silu"),
         norm_type=TRAIN_CONFIG.get("norm_type", "rmsnorm"),
@@ -163,8 +173,18 @@ def main():
         residual_scale_init=TRAIN_CONFIG.get("residual_scale_init", True),
         gradient_checkpointing=TRAIN_CONFIG.get("gradient_checkpointing", False),
     )
+    TRAIN_CONFIG["d_inner"] = model_config.d_inner
+    TRAIN_CONFIG["d_state"] = model_config.d_state
+    TRAIN_CONFIG["expand"] = model_config.expand
     
     model = SigerLM(model_config)
+    compile_requested = (
+        os.environ.get("SIGER_TORCH_COMPILE", "0") == "1"
+        or bool(TRAIN_CONFIG.get("torch_compile", False))
+    )
+    if compile_requested and hasattr(torch, "compile"):
+        print(f"Compiling model with torch.compile(mode={TRAIN_CONFIG.get('torch_compile_mode', 'reduce-overhead')})")
+        model = torch.compile(model, mode=TRAIN_CONFIG.get("torch_compile_mode", "reduce-overhead"))
 
     # 4. Trainer
     trainer = Trainer(model, TRAIN_CONFIG)

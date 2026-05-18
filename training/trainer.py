@@ -60,6 +60,14 @@ class Trainer:
             print(f"🖥️  Device: {self.device}")
             print_runtime_plan(self.runtime)
 
+        import os
+        env_batch = os.environ.get("SIGER_BATCH_SIZE")
+        if env_batch:
+            old_batch = int(config["batch_size"])
+            config["batch_size"] = int(env_batch)
+            if self.runtime.is_main_process:
+                print(f"Env override batch_size: {old_batch} -> {config['batch_size']}")
+
         if (
             config.get("auto_scale_batch", False)
             and self.runtime.device_count > 1
@@ -78,11 +86,19 @@ class Trainer:
 
         if config.get("auto_tune_batch_vram", False):
             base_batch = int(config["batch_size"])
+            per_device_cap = int(config.get("max_per_device_batch_size", base_batch))
+            global_cap = int(config.get("max_global_batch_size", base_batch))
+            if self.runtime.is_distributed:
+                global_cap = max(1, global_cap // max(1, self.runtime.world_size))
+            max_tuned_batch = max(base_batch, min(per_device_cap, global_cap))
             tuned_batch = suggest_cuda_batch_size(
                 base_batch_size=base_batch,
-                max_batch_size=int(config.get("max_global_batch_size", base_batch)),
+                max_batch_size=max_tuned_batch,
                 max_seq_len=int(config["max_seq_len"]),
                 d_model=int(config.get("d_model", 256)),
+                d_inner=int(config.get("d_inner", int(config.get("d_model", 256)) * int(config.get("expand", 2)))),
+                d_state=int(config.get("d_state", 16)),
+                n_layers=int(config.get("n_layers", 1)),
                 safety_fraction=float(config.get("vram_safety_fraction", 0.70)),
             )
             if tuned_batch > base_batch:
@@ -140,10 +156,12 @@ class Trainer:
         y = y.to(self.device)
 
         # Mixed precision (otomatis kalau CUDA)
+        device_str = str(self.device)
+        device_type = "cuda" if "cuda" in device_str else "cpu"
         with torch.autocast(
-            device_type=self.device,
+            device_type=device_type,
             dtype=self.amp_dtype,
-            enabled=(self.device == "cuda" and self.runtime.precision != "fp32"),
+            enabled=(device_type == "cuda" and self.runtime.precision != "fp32"),
         ):
             _, loss = self.model(x, targets=y)
             if loss.dim() > 0:
@@ -163,7 +181,8 @@ class Trainer:
         dataloader = self._build_dataloader(dataset)
         
         # 1. Pastikan device_type string untuk GradScaler
-        device_type = "cuda" if "cuda" in self.device else "cpu"
+        device_str = str(self.device)
+        device_type = "cuda" if "cuda" in device_str else "cpu"
         scaler = torch.amp.GradScaler(
             device_type,
             enabled=(device_type == "cuda" and self.runtime.precision == "fp16"),
@@ -179,15 +198,17 @@ class Trainer:
 
         self.model.train()
         max_steps = self.config["max_steps"]
-        print(f"\n🚀 Training starts | max_steps={max_steps:,}")
-        effective_batch = self.config["batch_size"] * self.accum_steps * max(1, self.runtime.world_size)
-        print(f"   batch_size={self.config['batch_size']} | "
-              f"grad_accum={self.accum_steps} | "
-              f"world_size={self.runtime.world_size} | "
-              f"effective_batch={effective_batch}\n")
+        if self.runtime.is_main_process:
+            print(f"\n🚀 Training starts | max_steps={max_steps:,}")
+            effective_batch = self.config["batch_size"] * self.accum_steps * max(1, self.runtime.world_size)
+            print(f"   batch_size={self.config['batch_size']} | "
+                  f"grad_accum={self.accum_steps} | "
+                  f"world_size={self.runtime.world_size} | "
+                  f"effective_batch={effective_batch}\n")
 
-        self.optimizer.zero_grad()
+        self.optimizer.zero_grad(set_to_none=True)
         epoch = 0
+        unscaled_loss = 0.0
         
         while global_step < max_steps:
             epoch += 1
@@ -223,7 +244,7 @@ class Trainer:
                     # Optimizer step via Scaler
                     scaler.step(self.optimizer)
                     scaler.update()
-                    self.optimizer.zero_grad()
+                    self.optimizer.zero_grad(set_to_none=True)
 
                     # LR scheduler step
                     lr = self.scheduler.step()
