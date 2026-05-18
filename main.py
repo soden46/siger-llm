@@ -35,6 +35,8 @@ TRAIN_CONFIG = {
     "max_global_batch_size": 512,
     "max_seq_len": 512 ,
     "grad_accum_steps": 4,
+    "max_chars_per_text_file": 8_000_000,
+    "max_dataset_chunks": 200_000,
     "device": "auto",
     "prefer_gpu": True,
     "multi_gpu": True,
@@ -69,7 +71,7 @@ TRAIN_CONFIG = {
     "log_interval": 10,
     "save_every": 1000,
     "checkpoint_dir": "./checkpoints",
-    "num_workers": 2,
+    "num_workers": 0,
 }
 
 def main():
@@ -78,21 +80,21 @@ def main():
     print(f"Tokenizer backend: {tok.backend} | vocab_size={tok.vocab_size}")
 
     # 2. Dataset — ganti dengan corpus lo
-    sample_texts = []
+    text_paths = sorted(Path("data").rglob("*.txt"))
 
-    for path in Path("data").rglob("*.txt"):
-        sample_texts.append(path.read_text(encoding="utf-8"))
-
-    if not sample_texts:
+    if not text_paths:
         raise RuntimeError(
             "Tidak ada file .txt di folder data/. "
             "Buat dulu data/corpus.txt lalu isi teks panjang."
         )
 
-    dataset = TextDataset(
-        texts=sample_texts,
+    print(f"Text files: {len(text_paths)}")
+    dataset = TextDataset.from_text_files(
+        paths=text_paths,
         tokenizer=tok,
-        max_seq_len=TRAIN_CONFIG["max_seq_len"]
+        max_seq_len=TRAIN_CONFIG["max_seq_len"],
+        max_chars_per_file=TRAIN_CONFIG.get("max_chars_per_text_file"),
+        max_chunks=TRAIN_CONFIG.get("max_dataset_chunks"),
     )
 
     if len(dataset) == 0:
