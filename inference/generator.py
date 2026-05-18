@@ -8,6 +8,10 @@ from inference.sampler import Sampler
 import inference.generator
 
 
+def _inside_tag(text: str, start_tag: str, end_tag: str) -> bool:
+    return text.rfind(start_tag) > text.rfind(end_tag)
+
+
 class Generator:
     """
     Autoregressive text generator.
@@ -41,6 +45,9 @@ class Generator:
         repetition_penalty: float = 1.15,
         lang: Optional[str]  = None,     # "id", "en", "code"
         stop_tokens: list    = None,
+        preserve_thought: bool = True,
+        thought_start: str = "<thought>",
+        thought_end: str = "</thought>",
     ) -> str:
         """
         Generate teks dari prompt.
@@ -79,6 +86,13 @@ class Generator:
 
             # Stop kalau ketemu EOS
             if next_token in stop_tokens:
+                if preserve_thought:
+                    partial_text = self.tokenizer.decode(
+                        generated_ids[len(input_ids):],
+                        skip_special_tokens=False,
+                    )
+                    if _inside_tag(partial_text, thought_start, thought_end):
+                        continue
                 break
 
         # Decode — skip prompt, return generated only
@@ -95,6 +109,9 @@ class Generator:
         top_p: float         = 0.9,
         repetition_penalty: float = 1.15,
         lang: Optional[str]  = None,
+        preserve_thought: bool = True,
+        thought_start: str = "<thought>",
+        thought_end: str = "</thought>",
     ) -> Iterator[str]:
         """
         Streaming generation — yield 1 token per iterasi.
@@ -118,6 +135,15 @@ class Generator:
             )
 
             if next_token == self.tokenizer.eos_id:
+                if preserve_thought:
+                    partial_text = self.tokenizer.decode(
+                        generated_ids[len(input_ids):],
+                        skip_special_tokens=False,
+                    )
+                    if _inside_tag(partial_text, thought_start, thought_end):
+                        generated_ids.append(next_token)
+                        yield self.tokenizer.decode([next_token], skip_special_tokens=False)
+                        continue
                 break
 
             generated_ids.append(next_token)

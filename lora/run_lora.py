@@ -74,6 +74,7 @@ def infer_model_config_from_state_dict(state_dict: dict) -> SigerConfig:
 
     if "layers.0.conv1d.weight" in state_dict:
         d_conv = state_dict["layers.0.conv1d.weight"].shape[-1]
+    norm_type = "layernorm" if "norm_f.bias" in state_dict else "rmsnorm"
 
     return SigerConfig(
         vocab_size=vocab_size,
@@ -83,6 +84,8 @@ def infer_model_config_from_state_dict(state_dict: dict) -> SigerConfig:
         d_conv=d_conv,
         expand=expand,
         max_seq_len=512,
+        norm_type=norm_type,
+        norm_bias=("norm_f.bias" in state_dict),
     )
 
 
@@ -98,6 +101,7 @@ def load_base_model(checkpoint_path: str) -> SigerLM:
     print(f"   d_state    : {model_config.d_state}")
     print(f"   d_conv     : {model_config.d_conv}")
     print(f"   expand     : {model_config.expand}")
+    print(f"   norm       : {model_config.norm_type}")
 
     model = SigerLM(model_config)
     model.load_state_dict(state_dict, strict=True)

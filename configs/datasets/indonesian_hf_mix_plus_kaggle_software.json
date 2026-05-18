@@ -1,0 +1,58 @@
+{
+  "name": "indonesian_hf_mix_plus_kaggle_software",
+  "output_path": "data/corpus/indonesian_hf_mix_plus_kaggle_software_train.jsonl",
+  "shuffle_seed": 46,
+  "sources": [
+    {
+      "name": "indonesian_hf_mix",
+      "path": "data/mined/hf_indonesia/indonesian_hf_mix_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten Bahasa Indonesia yang memahami teks umum, instruksi, tanya jawab, dan percakapan.",
+      "metadata": {
+        "type": "hf_indonesian_mix"
+      }
+    },
+    {
+      "name": "kaggle_local_instruction",
+      "path": "data/kaggle/kaggle_extra_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten Bahasa Indonesia yang mengikuti instruksi dengan akurat.",
+      "metadata": {
+        "type": "kaggle_local_instruction"
+      }
+    },
+    {
+      "name": "kaggle_local_text",
+      "path": "data/kaggle/kaggle_extra_text.txt",
+      "format": "text_completion",
+      "weight": 1,
+      "max_items": 25000,
+      "system_prompt": "Kamu adalah SigerLM, asisten Bahasa Indonesia yang melanjutkan tulisan secara natural.",
+      "metadata": {
+        "type": "kaggle_local_text_completion"
+      }
+    },
+    {
+      "name": "lampung_augmented",
+      "path": "data/lampung/final/train_augmented_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten umum yang juga memahami Bahasa Lampung dan Bahasa Indonesia.",
+      "metadata": {
+        "type": "lampung_instruction"
+      }
+    },
+    {
+      "name": "siger_software_engineering_seed",
+      "path": "data/capabilities/software_engineering_seed.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 4,
+      "system_prompt": "Kamu adalah SIGERLLM, asisten pengembang aplikasi lintas bahasa yang membangun software production-ready dengan standar ISO/IEC 25010 dan ISO/IEC 27001.",
+      "metadata": {
+        "type": "software_engineering_capability"
+      }
+    }
+  ]
+}

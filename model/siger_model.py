@@ -2,9 +2,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import math
 from torch.utils.checkpoint import checkpoint
 
 from model.ssm_block import SSMBlock
+from model.norms import RMSNorm, build_norm
 
 
 class SigerLM(nn.Module):
@@ -26,7 +28,12 @@ class SigerLM(nn.Module):
         ])
 
         # Final normalization sebelum LM head
-        self.norm_f = nn.LayerNorm(config.d_model)
+        self.norm_f = build_norm(
+            config.d_model,
+            norm_type=getattr(config, "norm_type", "rmsnorm"),
+            eps=getattr(config, "norm_eps", 1e-6),
+            bias=getattr(config, "norm_bias", False),
+        )
 
         # LM Head: hidden state → vocab logits
         self.lm_head = nn.Linear(
@@ -36,6 +43,8 @@ class SigerLM(nn.Module):
         )
 
         self.apply(self._init_weights)
+        self._init_selective_dt()
+        self._scale_residual_projections()
 
         # Weight tying:
         # embedding weight dan output projection weight dibagi
@@ -54,9 +63,25 @@ class SigerLM(nn.Module):
             if pad_token_id is not None and 0 <= pad_token_id < module.num_embeddings:
                 with torch.no_grad():
                     module.weight[pad_token_id].zero_()
-        elif isinstance(module, nn.LayerNorm):
+        elif isinstance(module, (nn.LayerNorm, RMSNorm)):
             nn.init.ones_(module.weight)
-            nn.init.zeros_(module.bias)
+            if getattr(module, "bias", None) is not None:
+                nn.init.zeros_(module.bias)
+
+    def _scale_residual_projections(self):
+        if not getattr(self.config, "residual_scale_init", True):
+            return
+        scale = 1.0 / math.sqrt(2.0 * max(1, int(getattr(self.config, "n_layers", 1))))
+        with torch.no_grad():
+            for name, param in self.named_parameters():
+                if name.endswith("out_proj.weight"):
+                    param.mul_(scale)
+
+    def _init_selective_dt(self):
+        for module in self.modules():
+            reset = getattr(module, "reset_dt_parameters", None)
+            if callable(reset):
+                reset()
 
     def forward(self, input_ids, targets=None):
         """

@@ -265,6 +265,16 @@ SIGER-SODEN
 
 Aliases cannot replace the base name; they are appended after `SIGER`.
 
+Core numerical defaults for new checkpoints:
+
+- `norm_type="rmsnorm"` for RMSNorm stability and lower normalization overhead.
+- `activation="silu"` for Mamba-style gated nonlinear mixing.
+- data-dependent `dt` selection in `SSMCore` through `x_proj` and `dt_proj`.
+- Mamba-style `dt_proj` initialization using `dt_min`, `dt_max`, and inverse softplus bias.
+- residual projection scaling by `1 / sqrt(2 * n_layers)` to reduce deep residual activation growth.
+
+Older checkpoints with LayerNorm bias are still detected by inference/LoRA loaders and loaded with `norm_type="layernorm"` for backward compatibility.
+
 End-to-end forward pass:
 
 ```txt
@@ -277,7 +287,7 @@ Token Embedding
 SSMBlock x N
       │
       ▼
-Final LayerNorm
+Final RMSNorm / LayerNorm
       │
       ▼
 LM Head
@@ -395,6 +405,32 @@ Preferred chat row:
 ```json
 {"messages":[{"role":"user","content":"..."},{"role":"assistant","content":"..."}]}
 ```
+
+Software engineering capability data is treated as a normal instruction source, not as model-core logic:
+
+```txt
+tools/build_software_engineering_seed.py
+  -> data/capabilities/software_engineering_seed.jsonl
+  -> configs/datasets/software_engineering_instruction.json
+  -> tools/build_instruction_corpus.py
+  -> data/corpus/software_engineering_instruction_train.jsonl
+  -> lora/run_lora.py
+```
+
+This keeps SigerLM general while allowing LoRA/instruction tuning to teach application-generation patterns such as AST-aware code analysis, ISO/IEC 25010 quality controls, ISO/IEC 27001 security controls, automated tests, structured logging, OpenAPI docs, and COMPLIANCE.md mapping.
+
+Reasoning capability data follows the same rule:
+
+```txt
+tools/build_reasoning_seed.py
+  -> data/capabilities/reasoning_cot_seed.jsonl
+  -> configs/datasets/reasoning_instruction.json
+  -> tools/build_instruction_corpus.py
+  -> data/corpus/reasoning_instruction_train.jsonl
+  -> lora/run_lora.py
+```
+
+Reasoning examples use `<thought>...</thought>` before the final answer. `inference/generator.py` is thought-aware so generation does not stop while a thought tag is still open.
 
 ## 11. Lampung Dataset Architecture
 

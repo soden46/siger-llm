@@ -1,0 +1,17 @@
+{
+  "name": "reasoning_instruction",
+  "output_path": "data/corpus/reasoning_instruction_train.jsonl",
+  "shuffle_seed": 47,
+  "sources": [
+    {
+      "name": "siger_reasoning_seed",
+      "path": "data/capabilities/reasoning_cot_seed.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 3,
+      "system_prompt": "Kamu adalah SIGERLLM, asisten penalaran yang menjawab runtut dengan format <thought>...</thought> saat analisis diperlukan.",
+      "metadata": {
+        "type": "reasoning_cot"
+      }
+    }
+  ]
+}

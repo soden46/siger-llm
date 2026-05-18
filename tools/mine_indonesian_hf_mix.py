@@ -3,10 +3,15 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from tools.cot_formatter import maybe_apply_cot
 
 
 DEFAULT_SYSTEM_PROMPT = (
@@ -418,13 +423,22 @@ def mine_sources(
     max_items_per_source: int | None,
     min_text_chars: int,
     streaming: bool,
+    cot_ratio: float = 0.0,
+    cot_mode: str = "auto",
 ) -> dict[str, Any]:
     instruction_output.parent.mkdir(parents=True, exist_ok=True)
     if text_output:
         text_output.parent.mkdir(parents=True, exist_ok=True)
 
     seen: set[tuple[str, str, str]] = set()
-    report: dict[str, Any] = {"schema_version": "siger_instruction_v1", "sources": [], "total_instruction_rows": 0, "total_text_rows": 0}
+    report: dict[str, Any] = {
+        "schema_version": "siger_instruction_v1",
+        "cot_ratio": cot_ratio,
+        "cot_mode": cot_mode,
+        "sources": [],
+        "total_instruction_rows": 0,
+        "total_text_rows": 0,
+    }
 
     with instruction_output.open("w", encoding="utf-8") as out_jsonl:
         text_handle = text_output.open("w", encoding="utf-8") if text_output else None
@@ -443,6 +457,7 @@ def mine_sources(
                         rows, texts = convert_row(raw, spec, min_text_chars=min_text_chars)
                         scanned += 1
                         for row in rows:
+                            row = maybe_apply_cot(row, ratio=cot_ratio, mode=cot_mode)
                             key = dedupe_key(row)
                             if key in seen:
                                 continue
@@ -508,6 +523,8 @@ def parse_args() -> argparse.Namespace:
         help="Extra source: dataset:kind[:split[:config[:max_items]]]. Kind: text, instruction, qa, translation, vocab.",
     )
     parser.add_argument("--only-custom-sources", action="store_true")
+    parser.add_argument("--cot-ratio", type=float, default=0.0, help="Convert this deterministic fraction of mined rows to CoT format.")
+    parser.add_argument("--cot-mode", choices=["auto", "minimal"], default="auto")
     return parser.parse_args()
 
 
@@ -521,6 +538,8 @@ def main() -> None:
         max_items_per_source=args.max_items_per_source,
         min_text_chars=args.min_text_chars,
         streaming=not args.no_streaming,
+        cot_ratio=args.cot_ratio,
+        cot_mode=args.cot_mode,
     )
     report_path = Path(args.report_output)
     report_path.parent.mkdir(parents=True, exist_ok=True)

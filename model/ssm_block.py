@@ -4,6 +4,19 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from model.ssm_core import SSMCore
+from model.norms import build_norm
+
+
+def _activation_fn(name: str):
+    name = (name or "silu").lower()
+    if name in {"silu", "swish"}:
+        return F.silu
+    if name == "gelu":
+        return F.gelu
+    if name == "relu":
+        return F.relu
+    raise ValueError(f"Unsupported activation: {name}")
+
 
 class SSMBlock(nn.Module):
     """
@@ -14,7 +27,12 @@ class SSMBlock(nn.Module):
         super().__init__()
         d_inner = config.d_model * config.expand
 
-        self.norm = nn.LayerNorm(config.d_model)
+        self.norm = build_norm(
+            config.d_model,
+            norm_type=getattr(config, "norm_type", "rmsnorm"),
+            eps=getattr(config, "norm_eps", 1e-6),
+            bias=getattr(config, "norm_bias", False),
+        )
 
         # Input projection: split jadi 2 branch
         self.in_proj = nn.Linear(config.d_model, d_inner * 2, bias=False)
@@ -28,6 +46,7 @@ class SSMBlock(nn.Module):
         )
 
         self.ssm = SSMCore(config)
+        self.activation = _activation_fn(getattr(config, "activation", "silu"))
 
         # Output projection
         self.out_proj = nn.Linear(d_inner, config.d_model, bias=False)
@@ -44,13 +63,13 @@ class SSMBlock(nn.Module):
         # Conv lokal (B, L, D) → (B, D, L) → conv → (B, L, D)
         x_conv = self.conv1d(x_branch.transpose(1, 2))
         x_conv = x_conv[:, :, :x_branch.size(1)].transpose(1, 2)
-        x_conv = F.silu(x_conv)
+        x_conv = self.activation(x_conv)
 
         # SSM
         y = self.ssm(x_conv)
 
         # Gating: multiply dengan sigmoid branch
-        y = y * F.silu(z_gate)
+        y = y * self.activation(z_gate)
 
         # Output projection + residual
         out = self.out_proj(y)

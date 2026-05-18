@@ -2,6 +2,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import math
 from einops import rearrange
 
 class SSMCore(nn.Module):
@@ -27,9 +28,26 @@ class SSMCore(nn.Module):
         self.D = nn.Parameter(torch.ones(d_inner))
 
         # Projections untuk B, C, delta (input-dependent = selective!)
-        dt_rank = max(1, d_inner // 16)
+        dt_rank = config.dt_rank if isinstance(config.dt_rank, int) else max(1, d_inner // 16)
+        self.dt_min = float(getattr(config, "dt_min", 0.001))
+        self.dt_max = float(getattr(config, "dt_max", 0.1))
+        self.dt_scale = float(getattr(config, "dt_scale", 1.0))
         self.x_proj = nn.Linear(d_inner, dt_rank + config.d_state * 2, bias=False)
         self.dt_proj = nn.Linear(dt_rank, d_inner, bias=True)
+
+    def reset_dt_parameters(self):
+        dt_rank = self.dt_proj.in_features
+        dt_init_std = (dt_rank ** -0.5) * self.dt_scale
+        nn.init.uniform_(self.dt_proj.weight, -dt_init_std, dt_init_std)
+
+        dt = torch.exp(
+            torch.rand(self.dt_proj.out_features)
+            * (math.log(self.dt_max) - math.log(self.dt_min))
+            + math.log(self.dt_min)
+        ).clamp(min=1e-4)
+        inv_dt = dt + torch.log(-torch.expm1(-dt))
+        with torch.no_grad():
+            self.dt_proj.bias.copy_(inv_dt)
 
     def step(self, x_t: torch.Tensor, h: torch.Tensor | None = None):
         # x_t: (B, 1, d_inner)

@@ -4,6 +4,7 @@ import argparse
 import csv
 import json
 import re
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,6 +13,10 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from tools.cot_formatter import maybe_apply_cot
 
 
 USER_AGENT = (
@@ -95,6 +100,10 @@ def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> int:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
             count += 1
     return count
+
+
+def apply_cot_to_rows(rows: Iterable[dict[str, Any]], *, cot_ratio: float, cot_mode: str) -> list[dict[str, Any]]:
+    return [maybe_apply_cot(row, ratio=cot_ratio, mode=cot_mode) for row in rows]
 
 
 def touch_jsonl(path: Path) -> None:
@@ -265,6 +274,8 @@ def mine_hf_dataset(
     config_name: str | None = None,
     split: str | None = None,
     max_items: int | None = None,
+    cot_ratio: float = 0.0,
+    cot_mode: str = "auto",
 ) -> MineStats:
     rows: list[dict[str, Any]] = []
     source_name = dataset_name.replace("/", "__")
@@ -294,6 +305,7 @@ def mine_hf_dataset(
         return MineStats(dataset_name, 0, str(output_path))
 
     rows = dedupe_rows(rows[:max_items] if max_items else rows)
+    rows = apply_cot_to_rows(rows, cot_ratio=cot_ratio, cot_mode=cot_mode)
     count = append_jsonl(output_path, rows)
     print(f"{dataset_name}: {count} rows -> {output_path}")
     return MineStats(dataset_name, count, str(output_path))
@@ -324,7 +336,14 @@ def iter_local_records(path: Path) -> Iterable[dict[str, Any]]:
     raise ValueError(f"Unsupported local file format: {path}")
 
 
-def mine_local_qa_file(path: Path, output_path: Path, *, max_items: int | None = None) -> MineStats:
+def mine_local_qa_file(
+    path: Path,
+    output_path: Path,
+    *,
+    max_items: int | None = None,
+    cot_ratio: float = 0.0,
+    cot_mode: str = "auto",
+) -> MineStats:
     rows: list[dict[str, Any]] = []
     for raw in iter_local_records(path):
         converted = row_to_qa_instruction(raw, path.stem)
@@ -333,6 +352,7 @@ def mine_local_qa_file(path: Path, output_path: Path, *, max_items: int | None =
         if max_items is not None and len(rows) >= max_items:
             break
     rows = dedupe_rows(rows)
+    rows = apply_cot_to_rows(rows, cot_ratio=cot_ratio, cot_mode=cot_mode)
     count = append_jsonl(output_path, rows)
     print(f"{path}: {count} rows -> {output_path}")
     return MineStats(str(path), count, str(output_path))
@@ -426,6 +446,8 @@ def mine_laravel_docs(
     max_pages_per_version: int,
     delay: float,
     max_chunks_per_page: int,
+    cot_ratio: float = 0.0,
+    cot_mode: str = "auto",
 ) -> MineStats:
     session = build_session()
     rows: list[dict[str, Any]] = []
@@ -452,6 +474,7 @@ def mine_laravel_docs(
                     rows.append(row)
             time.sleep(delay)
     rows = dedupe_rows(rows)
+    rows = apply_cot_to_rows(rows, cot_ratio=cot_ratio, cot_mode=cot_mode)
     count = append_jsonl(output_path, rows)
     print(f"Laravel docs: {count} rows -> {output_path}")
     return MineStats("laravel_docs", count, str(output_path))
@@ -507,6 +530,8 @@ def mine_santrikoding_laravel(
     max_articles: int,
     delay: float,
     max_chunks_per_article: int,
+    cot_ratio: float = 0.0,
+    cot_mode: str = "auto",
 ) -> MineStats:
     session = build_session()
     urls = collect_santrikoding_urls(session, max_pages=max_pages)[:max_articles]
@@ -536,6 +561,7 @@ def mine_santrikoding_laravel(
                 rows.append(row)
         time.sleep(delay)
     rows = dedupe_rows(rows)
+    rows = apply_cot_to_rows(rows, cot_ratio=cot_ratio, cot_mode=cot_mode)
     count = append_jsonl(output_path, rows)
     print(f"SantriKoding Laravel: {count} rows -> {output_path}")
     return MineStats("santrikoding_laravel", count, str(output_path))
@@ -579,6 +605,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-santrikoding-pages", type=int, default=8)
     parser.add_argument("--max-santrikoding-articles", type=int, default=120)
     parser.add_argument("--delay", type=float, default=1.0)
+    parser.add_argument("--cot-ratio", type=float, default=0.0, help="Convert this deterministic fraction of mined rows to CoT format.")
+    parser.add_argument("--cot-mode", choices=["auto", "minimal"], default="auto")
     return parser.parse_args()
 
 
@@ -600,16 +628,16 @@ def main() -> None:
         if args.include_large_qa:
             qa_sources.extend(LARGE_HF_QA_SOURCES)
         for source in qa_sources:
-            stats.append(mine_hf_dataset(source, qa_output, kind="qa", max_items=args.max_items))
+            stats.append(mine_hf_dataset(source, qa_output, kind="qa", max_items=args.max_items, cot_ratio=args.cot_ratio, cot_mode=args.cot_mode))
         for local_path in args.local_qa_file:
-            stats.append(mine_local_qa_file(Path(local_path), qa_output, max_items=args.max_items))
+            stats.append(mine_local_qa_file(Path(local_path), qa_output, max_items=args.max_items, cot_ratio=args.cot_ratio, cot_mode=args.cot_mode))
 
     if args.preset in {"all", "instruction"}:
         instruction_sources = list(HF_INSTRUCTION_SOURCES)
         if args.include_gated:
             instruction_sources.extend(GATED_HF_INSTRUCTION_SOURCES)
         for source in instruction_sources:
-            stats.append(mine_hf_dataset(source, instruction_output, kind="instruction", max_items=args.max_items))
+            stats.append(mine_hf_dataset(source, instruction_output, kind="instruction", max_items=args.max_items, cot_ratio=args.cot_ratio, cot_mode=args.cot_mode))
 
     for source in args.hf_source:
         output = qa_output if args.hf_kind == "qa" else instruction_output
@@ -621,6 +649,8 @@ def main() -> None:
                 config_name=args.hf_config,
                 split=args.hf_split,
                 max_items=args.max_items,
+                cot_ratio=args.cot_ratio,
+                cot_mode=args.cot_mode,
             )
         )
 
@@ -632,6 +662,8 @@ def main() -> None:
                 max_pages_per_version=args.max_laravel_pages,
                 delay=args.delay,
                 max_chunks_per_page=args.max_doc_chunks,
+                cot_ratio=args.cot_ratio,
+                cot_mode=args.cot_mode,
             )
         )
         stats.append(
@@ -641,6 +673,8 @@ def main() -> None:
                 max_articles=args.max_santrikoding_articles,
                 delay=args.delay,
                 max_chunks_per_article=args.max_doc_chunks,
+                cot_ratio=args.cot_ratio,
+                cot_mode=args.cot_mode,
             )
         )
 

@@ -38,6 +38,10 @@ class SigerConfig:
     # ── Regularization ────────────────────────────────────
     dropout: float   = 0.1
     bias: bool       = False
+    activation: str  = "silu"
+    norm_type: str   = "rmsnorm"
+    norm_eps: float  = 1e-6
+    norm_bias: bool  = False
 
     # ── Training ──────────────────────────────────────────
     max_seq_len: int  = 2048
@@ -45,12 +49,19 @@ class SigerConfig:
 
     # ── Initialization ────────────────────────────────────
     initializer_range: float = 0.02
+    residual_scale_init: bool = True
     residual_in_fp32: bool   = True
     gradient_checkpointing: bool = False
     model_alias: str | None = None
     model_base_name: str = field(init=False, default=SIGER_BASE_NAME)
 
     def __post_init__(self):
+        self.activation = self.activation.lower()
+        if self.activation not in {"silu", "swish", "gelu", "relu"}:
+            raise ValueError(f"Unsupported activation: {self.activation}")
+        self.norm_type = self.norm_type.lower()
+        if self.norm_type not in {"rmsnorm", "rms", "layernorm", "layer_norm", "ln"}:
+            raise ValueError(f"Unsupported norm_type: {self.norm_type}")
         if self.dt_rank == "auto":
             d_inner = self.d_model * self.expand
             self.dt_rank = max(1, d_inner // 16)

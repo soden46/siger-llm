@@ -69,6 +69,15 @@ Runtime plan
 SIGER_DISABLE_AUTO_DDP=1 python main.py
 ```
 
+Pilih kapasitas model base yang lebih kuat untuk reasoning jika VRAM/waktu cukup:
+
+```bash
+SIGER_MODEL_PROFILE=base python main.py
+SIGER_MODEL_PROFILE=reasoning_base python main.py
+```
+
+Profile default tetap `small` agar smoke test Kaggle lebih aman. Profile `base` memakai `d_model=512`, `n_layers=12`; profile `reasoning_base` menaikkan context training ke `max_seq_len=512`.
+
 ## 5. Build Dataset Lampung
 
 ```powershell
@@ -147,6 +156,14 @@ Mining source Indonesia campuran:
 python tools/mine_indonesian_hf_mix.py --max-items-per-source 50000
 ```
 
+Mining source Indonesia campuran dengan sebagian row dibuat Chain-of-Thought:
+
+```bash
+python tools/mine_indonesian_hf_mix.py --max-items-per-source 50000 --cot-ratio 0.25
+```
+
+`--cot-ratio 0.25` berarti sekitar 25% row diberi format `<thought>...</thought>` secara deterministik. Hindari langsung 100% untuk dataset besar agar model tetap bisa menjawab ringkas saat user tidak meminta penalaran.
+
 Ingest dataset dari Kaggle Add Input:
 
 ```bash
@@ -159,10 +176,45 @@ Build corpus instruction:
 python tools/build_instruction_corpus.py --registry configs/datasets/indonesian_hf_mix.json
 ```
 
+Build corpus instruction dengan CoT conversion dari registry apa pun:
+
+```bash
+python tools/build_instruction_corpus.py --registry configs/datasets/indonesian_hf_mix.json --cot-ratio 0.25
+```
+
 Build corpus HF mix + Kaggle Add Input:
 
 ```bash
 python tools/build_instruction_corpus.py --registry configs/datasets/indonesian_hf_mix_plus_kaggle.json
+```
+
+Build software engineering capability seed:
+
+```bash
+python tools/build_software_engineering_seed.py
+python tools/build_instruction_corpus.py --registry configs/datasets/software_engineering_instruction.json
+```
+
+Build reasoning / Chain-of-Thought seed:
+
+```bash
+python tools/build_reasoning_seed.py
+python tools/build_instruction_corpus.py --registry configs/datasets/reasoning_instruction.json
+```
+
+Build HF mix + Kaggle + Lampung + software engineering capability:
+
+```bash
+python tools/build_software_engineering_seed.py
+python tools/build_instruction_corpus.py --registry configs/datasets/indonesian_hf_mix_plus_kaggle_software.json
+```
+
+Build HF mix + Kaggle + Lampung + reasoning + software engineering:
+
+```bash
+python tools/build_software_engineering_seed.py
+python tools/build_reasoning_seed.py
+python tools/build_instruction_corpus.py --registry configs/datasets/indonesian_hf_mix_plus_kaggle_reasoning.json
 ```
 
 Output penting:
@@ -205,6 +257,31 @@ Indonesian HF mix + Kaggle Add Input LoRA:
 ```powershell
 python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix_plus_kaggle.json
 python lora\run_lora.py --config configs\training\indonesian_hf_mix_plus_kaggle_lora.json
+```
+
+Software engineering capability LoRA:
+
+```powershell
+python tools\build_software_engineering_seed.py
+python tools\build_instruction_corpus.py --registry configs\datasets\software_engineering_instruction.json
+python lora\run_lora.py --config configs\training\software_engineering_lora.json
+```
+
+Reasoning / Chain-of-Thought LoRA:
+
+```powershell
+python tools\build_reasoning_seed.py
+python tools\build_instruction_corpus.py --registry configs\datasets\reasoning_instruction.json
+python lora\run_lora.py --config configs\training\reasoning_lora.json
+```
+
+Indonesian HF mix + Kaggle + Lampung + reasoning LoRA:
+
+```powershell
+python tools\build_software_engineering_seed.py
+python tools\build_reasoning_seed.py
+python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix_plus_kaggle_reasoning.json
+python lora\run_lora.py --config configs\training\indonesian_hf_mix_plus_kaggle_reasoning_lora.json
 ```
 
 Config Indonesian HF mix memakai `batch_size=2` sebagai titik awal aman. Trainer LoRA bisa menaikkan batch secara konservatif lewat VRAM-aware tuning.

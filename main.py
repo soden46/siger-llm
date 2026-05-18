@@ -1,5 +1,6 @@
 # main.py
 import sys
+import os
 import torch
 from pathlib import Path
 from config.model_config   import SigerConfig
@@ -10,6 +11,13 @@ from training.trainer      import Trainer
 from model.ssm_core import SSMCore
 from optimization.gpu import maybe_relaunch_with_torchrun
 
+
+MODEL_PROFILES = {
+    "small": {"d_model": 256, "n_layers": 8, "max_seq_len": 128},
+    "base": {"d_model": 512, "n_layers": 12, "max_seq_len": 256},
+    "reasoning_base": {"d_model": 512, "n_layers": 12, "max_seq_len": 512},
+}
+
 # ── Config ──────────────────────────────────────────────────
 TRAIN_CONFIG = {
     # Model
@@ -18,9 +26,16 @@ TRAIN_CONFIG = {
     # "n_layers":      12,
     
     # Model kecil dulu buat smoke test
+    "model_profile": "small",
     "vocab_size": 100271,
     "d_model": 256,
     "n_layers": 8,
+    "activation": "silu",
+    "norm_type": "rmsnorm",
+    "norm_eps": 1e-6,
+    "norm_bias": False,
+    "initializer_range": 0.02,
+    "residual_scale_init": True,
 
     # Training
     # "max_steps":     100_000,
@@ -81,6 +96,12 @@ TRAIN_CONFIG = {
 }
 
 def main():
+    profile_name = os.environ.get("SIGER_MODEL_PROFILE", TRAIN_CONFIG.get("model_profile", "small")).lower()
+    if profile_name not in MODEL_PROFILES:
+        raise ValueError(f"Unknown SIGER_MODEL_PROFILE={profile_name}. Choose: {', '.join(MODEL_PROFILES)}")
+    TRAIN_CONFIG.update(MODEL_PROFILES[profile_name])
+    print(f"Model profile: {profile_name}")
+
     maybe_relaunch_with_torchrun(
         script_path=Path(__file__).resolve(),
         argv=sys.argv[1:],
@@ -122,6 +143,12 @@ def main():
         d_model=TRAIN_CONFIG["d_model"],
         n_layers=TRAIN_CONFIG["n_layers"],
         max_seq_len=TRAIN_CONFIG["max_seq_len"],
+        activation=TRAIN_CONFIG.get("activation", "silu"),
+        norm_type=TRAIN_CONFIG.get("norm_type", "rmsnorm"),
+        norm_eps=TRAIN_CONFIG.get("norm_eps", 1e-6),
+        norm_bias=TRAIN_CONFIG.get("norm_bias", False),
+        initializer_range=TRAIN_CONFIG.get("initializer_range", 0.02),
+        residual_scale_init=TRAIN_CONFIG.get("residual_scale_init", True),
         gradient_checkpointing=TRAIN_CONFIG.get("gradient_checkpointing", False),
     )
     

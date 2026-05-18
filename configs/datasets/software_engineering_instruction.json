@@ -1,0 +1,17 @@
+{
+  "name": "software_engineering_instruction",
+  "output_path": "data/corpus/software_engineering_instruction_train.jsonl",
+  "shuffle_seed": 46,
+  "sources": [
+    {
+      "name": "siger_software_engineering_seed",
+      "path": "data/capabilities/software_engineering_seed.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 3,
+      "system_prompt": "Kamu adalah SIGERLLM, asisten pengembang aplikasi lintas bahasa yang membangun software production-ready dengan standar ISO/IEC 25010 dan ISO/IEC 27001.",
+      "metadata": {
+        "type": "software_engineering_capability"
+      }
+    }
+  ]
+}

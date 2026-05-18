@@ -10,6 +10,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from training.dataset_registry import DatasetRegistry, DatasetSource, iter_jsonl, read_text_chunks
+from tools.cot_formatter import maybe_apply_cot
 
 
 DEFAULT_SYSTEM_PROMPT = (
@@ -191,10 +192,18 @@ def dedupe(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return deduped
 
 
-def build_corpus(registry: DatasetRegistry) -> list[dict[str, Any]]:
+def build_corpus(
+    registry: DatasetRegistry,
+    *,
+    cot_ratio: float = 0.0,
+    cot_mode: str = "auto",
+) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for source in registry.sources:
         rows.extend(convert_source(source))
+
+    if cot_ratio > 0:
+        rows = [maybe_apply_cot(row, ratio=cot_ratio, mode=cot_mode) for row in rows]
 
     rows = dedupe(rows)
     random.Random(registry.shuffle_seed).shuffle(rows)
@@ -217,10 +226,22 @@ def main() -> None:
         default="configs/datasets/general_instruction.json",
         help="Path to dataset registry JSON.",
     )
+    parser.add_argument(
+        "--cot-ratio",
+        type=float,
+        default=0.0,
+        help="Convert this deterministic fraction of rows to <thought>...</thought> CoT format.",
+    )
+    parser.add_argument(
+        "--cot-mode",
+        choices=["auto", "minimal"],
+        default="auto",
+        help="CoT reasoning template style.",
+    )
     args = parser.parse_args()
 
     registry = DatasetRegistry.from_json(args.registry)
-    rows = build_corpus(registry)
+    rows = build_corpus(registry, cot_ratio=args.cot_ratio, cot_mode=args.cot_mode)
     write_jsonl(registry.output_path, rows)
 
     print(f"\nBuilt corpus: {registry.name}")
