@@ -8,6 +8,8 @@ Output akhirnya adalah JSONL instruction row:
 {"instruction":"...","input":"...","output":"...","system":"...","source":"...","type":"..."}
 ```
 
+Semua tool mining harus menormalisasi output ke schema ini. Field tambahan dari dataset asal tidak dibawa ke corpus final kecuali sengaja ditambahkan ke metadata di masa depan.
+
 Format ini bisa langsung diproses oleh:
 
 ```powershell
@@ -223,6 +225,7 @@ vocab
 ```
 
 Kalau salah satu dataset gagal load karena schema, akses, atau dependency HF, tool akan mencatat error di report dan lanjut ke dataset berikutnya.
+Report HF mix juga mencatat `sample_keys` untuk membantu memperbaiki source yang menghasilkan `0 rows`.
 
 ## 6.2 Ingest Kaggle Add Input Lokal
 

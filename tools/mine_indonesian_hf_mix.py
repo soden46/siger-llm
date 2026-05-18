@@ -13,6 +13,10 @@ DEFAULT_SYSTEM_PROMPT = (
     "Kamu adalah SigerLM, asisten AI umum yang cerdas, akurat, dan ringkas. "
     "Jawab dalam Bahasa Indonesia kecuali user meminta bahasa lain."
 )
+CUSTOMER_SUPPORT_SYSTEM_PROMPT = (
+    "Kamu adalah SigerLM, asisten customer support Bahasa Indonesia yang ramah, "
+    "jelas, dan membantu menyelesaikan masalah pengguna."
+)
 TEXT_SYSTEM_PROMPT = (
     "Kamu adalah SigerLM, asisten Bahasa Indonesia yang memahami teks umum "
     "dan melanjutkan tulisan secara natural."
@@ -89,13 +93,14 @@ def flatten_texts(value: Any) -> Iterable[str]:
 
 
 def first_value(row: dict[str, Any], keys: list[str]) -> Any:
-    lower_map = {key.lower(): key for key in row.keys()}
+    lower_map = {str(key).lower(): key for key in row.keys()}
     for key in keys:
         current: Any = row
         ok = True
         for part in key.split("."):
             if isinstance(current, dict):
-                actual_key = lower_map.get(part.lower()) if current is row else None
+                current_lower = {str(k).lower(): k for k in current.keys()}
+                actual_key = current_lower.get(part.lower())
                 if actual_key and actual_key in current:
                     current = current[actual_key]
                 elif part in current:
@@ -109,6 +114,21 @@ def first_value(row: dict[str, Any], keys: list[str]) -> Any:
         if ok and current not in (None, ""):
             return current
     return None
+
+
+def ensure_siger_instruction_row(row: dict[str, Any]) -> dict[str, Any] | None:
+    instruction = normalize_text(row.get("instruction"))
+    output = clean_text(row.get("output"))
+    if not instruction or not output:
+        return None
+    return {
+        "instruction": instruction,
+        "input": clean_text(row.get("input")),
+        "output": output,
+        "system": normalize_text(row.get("system")) or DEFAULT_SYSTEM_PROMPT,
+        "source": normalize_text(row.get("source")) or "unknown",
+        "type": normalize_text(row.get("type")) or "instruction",
+    }
 
 
 def instruction_row(
@@ -125,14 +145,36 @@ def instruction_row(
     output = clean_text(output)
     if not instruction or not output:
         return None
-    return {
+    return ensure_siger_instruction_row({
         "instruction": instruction,
         "input": input_text,
         "output": output,
         "system": system_prompt,
         "source": source,
         "type": task_type,
-    }
+    })
+
+
+def pair_from_known_keys(row: dict[str, Any], left_keys: list[str], right_keys: list[str]) -> tuple[str, str]:
+    left = first_value(row, left_keys)
+    right = first_value(row, right_keys)
+    return clean_text(left), clean_text(right)
+
+
+def first_two_text_columns(row: dict[str, Any]) -> tuple[str, str]:
+    values: list[str] = []
+    for key, value in row.items():
+        key_l = str(key).lower()
+        if key_l.startswith("_"):
+            continue
+        text = clean_text(value)
+        if len(text) >= 2:
+            values.append(text)
+        if len(values) >= 2:
+            break
+    if len(values) >= 2:
+        return values[0], values[1]
+    return "", ""
 
 
 def row_to_instruction(row: dict[str, Any], source: str) -> list[dict[str, Any]]:
@@ -160,15 +202,23 @@ def row_to_instruction(row: dict[str, Any], source: str) -> list[dict[str, Any]]
         if output:
             return output
 
-    instruction = first_value(row, ["instruction", "prompt", "question", "input", "query"])
-    input_text = first_value(row, ["context", "input_text", "source", "text"])
-    answer = first_value(row, ["output", "response", "answer", "completion", "target"])
+    instruction = first_value(row, [
+        "instruction", "prompt", "question", "query", "user", "customer", "customer_message",
+        "user_message", "input", "text_input", "problem", "issue",
+    ])
+    input_text = first_value(row, ["context", "input_text", "source", "text", "conversation", "history"])
+    answer = first_value(row, [
+        "output", "response", "answer", "completion", "target", "assistant", "assistant_message",
+        "agent", "agent_response", "reply", "label",
+    ])
+    system_prompt = CUSTOMER_SUPPORT_SYSTEM_PROMPT if "customer" in source.lower() or "support" in source.lower() else DEFAULT_SYSTEM_PROMPT
     built = instruction_row(
         normalize_text(instruction),
         clean_text(answer),
         input_text=clean_text(input_text) if input_text != instruction else "",
+        system_prompt=system_prompt,
         source=source,
-        task_type="general_instruction",
+        task_type="customer_support" if system_prompt == CUSTOMER_SUPPORT_SYSTEM_PROMPT else "general_instruction",
     )
     return [built] if built else []
 
@@ -191,11 +241,37 @@ def row_to_qa(row: dict[str, Any], source: str) -> list[dict[str, Any]]:
 def row_to_translation(row: dict[str, Any], source: str) -> list[dict[str, Any]]:
     translation = first_value(row, ["translation"])
     if isinstance(translation, dict):
-        id_text = first_value(translation, ["id", "indonesian", "indonesia", "source"])
-        en_text = first_value(translation, ["en", "english", "target"])
+        id_text = first_value(translation, ["id", "indonesian", "indonesia", "indo", "id_id", "source"])
+        en_text = first_value(translation, ["en", "english", "eng", "en_uk", "en_us", "target"])
     else:
-        id_text = first_value(row, ["id", "indonesian", "indonesia", "text_id", "source", "input"])
-        en_text = first_value(row, ["en", "english", "text_en", "target", "output"])
+        id_text, en_text = pair_from_known_keys(
+            row,
+            [
+                "id", "indonesian", "indonesia", "indo", "bahasa_indonesia", "text_id", "id_text",
+                "sentence_id", "source_id", "source", "input", "text_1", "text1", "kalimat_indonesia",
+            ],
+            [
+                "en", "english", "eng", "bahasa_inggris", "text_en", "en_text", "sentence_en",
+                "target_en", "target", "output", "text_2", "text2", "kalimat_inggris",
+            ],
+        )
+
+        if not id_text or not en_text:
+            pairs = [
+                ("indonesian", "translation"),
+                ("translation_id", "translation_en"),
+                ("src", "tgt"),
+                ("source_text", "target_text"),
+                ("input_text", "output_text"),
+                ("question", "answer"),
+            ]
+            for left_key, right_key in pairs:
+                id_text, en_text = pair_from_known_keys(row, [left_key], [right_key])
+                if id_text and en_text:
+                    break
+
+        if not id_text or not en_text:
+            id_text, en_text = first_two_text_columns(row)
 
     id_text = clean_text(id_text)
     en_text = clean_text(en_text)
@@ -222,8 +298,8 @@ def row_to_translation(row: dict[str, Any], source: str) -> list[dict[str, Any]]
 
 
 def row_to_vocab(row: dict[str, Any], source: str) -> list[dict[str, Any]]:
-    word = first_value(row, ["word", "kata", "slang", "term", "token", "input"])
-    meaning = first_value(row, ["meaning", "arti", "definition", "formal", "normalized", "output"])
+    word = first_value(row, ["word", "kata", "slang", "term", "token", "input", "alay", "informal"])
+    meaning = first_value(row, ["meaning", "arti", "definition", "formal", "normalized", "normal", "baku", "output"])
     example = first_value(row, ["example", "contoh", "sentence", "context"])
     input_text = clean_text(example)
     built = instruction_row(
@@ -348,7 +424,7 @@ def mine_sources(
         text_output.parent.mkdir(parents=True, exist_ok=True)
 
     seen: set[tuple[str, str, str]] = set()
-    report: dict[str, Any] = {"sources": [], "total_instruction_rows": 0, "total_text_rows": 0}
+    report: dict[str, Any] = {"schema_version": "siger_instruction_v1", "sources": [], "total_instruction_rows": 0, "total_text_rows": 0}
 
     with instruction_output.open("w", encoding="utf-8") as out_jsonl:
         text_handle = text_output.open("w", encoding="utf-8") if text_output else None
@@ -358,9 +434,12 @@ def mine_sources(
                 source_rows = 0
                 source_texts = 0
                 scanned = 0
+                sample_keys: list[str] = []
                 print(f"Loading {spec.name} ({spec.kind})")
                 try:
                     for raw in iter_hf_rows(spec, streaming=streaming):
+                        if not sample_keys:
+                            sample_keys = sorted(str(key) for key in raw.keys())
                         rows, texts = convert_row(raw, spec, min_text_chars=min_text_chars)
                         scanned += 1
                         for row in rows:
@@ -385,6 +464,7 @@ def mine_sources(
                             "rows": source_rows,
                             "texts": source_texts,
                             "scanned": scanned,
+                            "sample_keys": sample_keys,
                             "error": str(exc),
                         }
                     )
@@ -398,6 +478,7 @@ def mine_sources(
                         "rows": source_rows,
                         "texts": source_texts,
                         "scanned": scanned,
+                        "sample_keys": sample_keys,
                     }
                 )
                 report["total_instruction_rows"] += source_rows

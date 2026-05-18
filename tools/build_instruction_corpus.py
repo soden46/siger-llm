@@ -42,6 +42,31 @@ def instruction_row(
     return row
 
 
+def normalize_instruction_record(
+    raw: dict[str, Any],
+    *,
+    source_name: str,
+    system_prompt: str | None,
+    task_type: str,
+) -> dict[str, Any] | None:
+    instruction = normalize_text(raw.get("instruction"))
+    output = normalize_text(raw.get("output"))
+    input_text = normalize_text(raw.get("input"))
+
+    if not instruction or not output:
+        return None
+
+    row = {
+        "instruction": instruction,
+        "input": input_text,
+        "output": output,
+        "system": normalize_text(raw.get("system") or system_prompt or DEFAULT_SYSTEM_PROMPT),
+        "source": normalize_text(raw.get("source") or source_name),
+        "type": normalize_text(raw.get("type") or task_type),
+    }
+    return row
+
+
 def convert_instruction_jsonl(source: DatasetSource) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
 
@@ -53,15 +78,14 @@ def convert_instruction_jsonl(source: DatasetSource) -> list[dict[str, Any]]:
         if not instruction or not output:
             continue
 
-        row = dict(raw)
-        row["instruction"] = instruction
-        row["input"] = input_text
-        row["output"] = output
-        row.setdefault("source", source.name)
-        row.setdefault("type", source.metadata.get("type", "instruction"))
-        if source.system_prompt and not row.get("system"):
-            row["system"] = source.system_prompt
-        rows.append(row)
+        row = normalize_instruction_record(
+            raw,
+            source_name=source.name,
+            system_prompt=source.system_prompt,
+            task_type=source.metadata.get("type", "instruction"),
+        )
+        if row:
+            rows.append(row)
 
     return rows
 
