@@ -7,6 +7,7 @@ from config.model_config   import SigerConfig
 from model.siger_model     import SigerLM
 from tokenizer.hybrid_tokenizer import build_tokenizer
 from training.dataset      import TextDataset
+from training.text_sources import resolve_text_sources
 from training.trainer      import Trainer
 from model.ssm_core import SSMCore
 from optimization.gpu import maybe_relaunch_with_torchrun
@@ -54,6 +55,13 @@ TRAIN_CONFIG = {
     "grad_accum_steps": 2,
     "max_chars_per_text_file": 8_000_000,
     "max_dataset_chunks": 200_000,
+    "text_sources": ["data"],
+    "text_include": "*.txt",
+    "text_exclude": [
+        "data/tmp/*",
+        "data/**/*.report.txt",
+    ],
+    "max_text_files": None,
     "device": "auto",
     "prefer_gpu": True,
     "multi_gpu": True,
@@ -113,16 +121,20 @@ def main():
     tok = build_tokenizer("auto")
     print(f"Tokenizer backend: {tok.backend} | vocab_size={tok.vocab_size}")
 
-    # 2. Dataset — ganti dengan corpus lo
-    text_paths = sorted(Path("data").rglob("*.txt"))
+    # 2. Dataset sources
+    text_paths = resolve_text_sources(TRAIN_CONFIG)
 
     if not text_paths:
         raise RuntimeError(
-            "Tidak ada file .txt di folder data/. "
-            "Buat dulu data/corpus.txt lalu isi teks panjang."
+            "Tidak ada text source untuk base training. "
+            "Set SIGER_TEXT_SOURCES ke file/folder/glob, atau isi TRAIN_CONFIG['text_sources']."
         )
 
     print(f"Text files: {len(text_paths)}")
+    for path in text_paths[:10]:
+        print(f"  - {path}")
+    if len(text_paths) > 10:
+        print(f"  ... +{len(text_paths) - 10} more")
     dataset = TextDataset.from_text_files(
         paths=text_paths,
         tokenizer=tok,

@@ -69,6 +69,15 @@ Runtime plan
 SIGER_DISABLE_AUTO_DDP=1 python main.py
 ```
 
+Base training text sources bisa diatur tanpa edit kode:
+
+```bash
+SIGER_TEXT_SOURCES=data/indonesian_hf_mix.txt,data/kaggle/kaggle_extra_text.txt python main.py
+SIGER_TEXT_SOURCES=data SIGER_TEXT_INCLUDE=*.txt SIGER_MAX_TEXT_FILES=8 python main.py
+```
+
+`SIGER_TEXT_SOURCES` menerima file, folder, atau glob yang dipisahkan koma/semicolon. Default tetap `data` dengan include `*.txt`.
+
 Pilih kapasitas model base yang lebih kuat untuk reasoning jika VRAM/waktu cukup:
 
 ```bash
