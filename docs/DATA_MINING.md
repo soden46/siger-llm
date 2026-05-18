@@ -224,6 +224,43 @@ vocab
 
 Kalau salah satu dataset gagal load karena schema, akses, atau dependency HF, tool akan mencatat error di report dan lanjut ke dataset berikutnya.
 
+## 6.2 Ingest Kaggle Add Input Lokal
+
+Dataset yang ditambahkan dari panel **Add Input** Kaggle tersedia di `/kaggle/input`, tetapi tidak otomatis ikut training. Gunakan tool ini untuk scan file `.txt`, `.csv`, `.json`, dan `.jsonl` lalu mengubahnya menjadi data lokal SigerLM:
+
+```powershell
+python tools\ingest_kaggle_inputs.py
+```
+
+Output:
+
+```txt
+data/kaggle/kaggle_extra_text.txt
+data/kaggle/kaggle_extra_instruction.jsonl
+configs/datasets/kaggle_local_inputs.json
+data/kaggle/kaggle_ingest_report.json
+```
+
+`kaggle_extra_text.txt` otomatis ikut base training karena `main.py` membaca file `.txt` di folder `data/`. `kaggle_extra_instruction.jsonl` bisa dipakai LoRA/instruction tuning melalui registry.
+
+Untuk membatasi jumlah file saat smoke test:
+
+```powershell
+python tools\ingest_kaggle_inputs.py --max-files 20
+```
+
+Untuk build corpus dari input Kaggle saja:
+
+```powershell
+python tools\build_instruction_corpus.py --registry configs\datasets\kaggle_local_inputs.json
+```
+
+Untuk build corpus gabungan HF mix + Kaggle input + Lampung:
+
+```powershell
+python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix_plus_kaggle.json
+```
+
 ## 7. Build Corpus agar Bisa Dibaca SigerLM
 
 Setelah file mining tersedia:
@@ -250,6 +287,18 @@ Output corpus:
 
 ```txt
 data/corpus/indonesian_hf_mix_train.jsonl
+```
+
+Untuk Indonesian HF mix + Kaggle Add Input:
+
+```powershell
+python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix_plus_kaggle.json
+```
+
+Output corpus:
+
+```txt
+data/corpus/indonesian_hf_mix_plus_kaggle_train.jsonl
 ```
 
 ## 8. Rekomendasi Mixing
@@ -292,4 +341,5 @@ Compile check:
 ```powershell
 python -m py_compile tools\mine_general_assistant_data.py training\dataset_registry.py tools\build_instruction_corpus.py
 python -m py_compile tools\mine_indonesian_hf_mix.py
+python -m py_compile tools\ingest_kaggle_inputs.py
 ```

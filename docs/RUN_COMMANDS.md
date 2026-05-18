@@ -142,10 +142,22 @@ Mining source Indonesia campuran:
 python tools/mine_indonesian_hf_mix.py --max-items-per-source 50000
 ```
 
+Ingest dataset dari Kaggle Add Input:
+
+```bash
+python tools/ingest_kaggle_inputs.py
+```
+
 Build corpus instruction:
 
 ```bash
 python tools/build_instruction_corpus.py --registry configs/datasets/indonesian_hf_mix.json
+```
+
+Build corpus HF mix + Kaggle Add Input:
+
+```bash
+python tools/build_instruction_corpus.py --registry configs/datasets/indonesian_hf_mix_plus_kaggle.json
 ```
 
 Output penting:
@@ -154,6 +166,8 @@ Output penting:
 data/mined/hf_indonesia/indonesian_hf_mix_instruction.jsonl
 data/corpus/indonesian_hf_mix_train.jsonl
 data/indonesian_hf_mix.txt
+data/kaggle/kaggle_extra_text.txt
+data/kaggle/kaggle_extra_instruction.jsonl
 ```
 
 `data/indonesian_hf_mix.txt` otomatis bisa ikut base training karena `main.py` membaca semua file `.txt` di `data/`.
@@ -179,6 +193,13 @@ Indonesian HF mix LoRA:
 ```powershell
 python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix.json
 python lora\run_lora.py --config configs\training\indonesian_hf_mix_lora.json
+```
+
+Indonesian HF mix + Kaggle Add Input LoRA:
+
+```powershell
+python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix_plus_kaggle.json
+python lora\run_lora.py --config configs\training\indonesian_hf_mix_plus_kaggle_lora.json
 ```
 
 Config Indonesian HF mix memakai `batch_size=2` supaya DataParallel bisa membagi batch ke dua GPU. Ini tetap konservatif untuk T4x2 karena effective batch masih `2 x 4 accum = 8`.

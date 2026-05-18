@@ -7,8 +7,8 @@ from typing import List, Optional
 @dataclass
 class LoRAConfig:
     # ── LoRA core ─────────────────────────────────────────
-    rank: int = 8
-    alpha: float = 16.0
+    rank: int = 32
+    alpha: float = 32.0
     dropout: float = 0.05
 
     # Layer target LoRA pada arsitektur Mamba/SSM
@@ -20,12 +20,12 @@ class LoRAConfig:
     ])
 
     # ── Training ──────────────────────────────────────────
-    learning_rate: float = 2e-4
-    max_steps: int = 300
-    batch_size: int = 2
+    learning_rate: float = 1e-4
+    max_steps: int = 2500
+    batch_size: int = 8
     grad_accum: int = 4
-    warmup_steps: int = 20
-    max_seq_len: int = 128
+    warmup_steps: int = 100
+    max_seq_len: int = 512
     weight_decay: float = 0.01
     device: str = "auto"  # "auto", "cpu", or "cuda"
     prefer_gpu: bool = True
