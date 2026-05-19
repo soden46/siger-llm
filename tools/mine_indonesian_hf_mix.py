@@ -5,6 +5,7 @@ import ast
 import json
 import re
 import sys
+import warnings
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -109,7 +110,9 @@ def parse_mapping_string(value: Any) -> dict[str, Any] | None:
 
     for parser in (json.loads, ast.literal_eval):
         try:
-            parsed = parser(text)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", SyntaxWarning)
+                parsed = parser(text)
         except (ValueError, SyntaxError, json.JSONDecodeError):
             continue
         if isinstance(parsed, dict):
@@ -244,13 +247,17 @@ def row_to_instruction(row: dict[str, Any], source: str) -> list[dict[str, Any]]
 
     instruction = first_value(row, [
         "instruction", "prompt", "question", "query", "user", "customer", "customer_message",
-        "user_message", "input", "text_input", "problem", "issue",
+        "user_message", "input", "text_input", "problem", "issue", "column3",
     ])
-    input_text = first_value(row, ["context", "input_text", "source", "text", "conversation", "history"])
+    input_text = first_value(row, ["context", "input_text", "source", "text", "conversation", "history", "column1", "column2"])
     answer = first_value(row, [
         "output", "response", "answer", "completion", "target", "assistant", "assistant_message",
-        "agent", "agent_response", "reply", "label", "response_j",
+        "agent", "agent_response", "reply", "label", "response_j", "column4",
     ])
+    if normalize_text(instruction).lower() in {"instruction", "prompt", "question"}:
+        return []
+    if normalize_text(answer).lower() in {"response", "answer", "output"}:
+        return []
     system_prompt = CUSTOMER_SUPPORT_SYSTEM_PROMPT if "customer" in source.lower() or "support" in source.lower() else DEFAULT_SYSTEM_PROMPT
     built = instruction_row(
         normalize_text(instruction),
@@ -350,12 +357,25 @@ def row_to_translation(row: dict[str, Any], source: str) -> list[dict[str, Any]]
 
 
 def row_to_vocab(row: dict[str, Any], source: str) -> list[dict[str, Any]]:
-    word = first_value(row, ["word", "kata", "slang", "term", "token", "input", "alay", "informal"])
+    word = first_value(row, ["word", "kata", "slang", "term", "token", "input", "alay", "informal", "text"])
     meaning = first_value(row, ["meaning", "arti", "definition", "formal", "normalized", "normal", "baku", "output"])
     example = first_value(row, ["example", "contoh", "sentence", "context"])
+    word_text = normalize_text(word)
+    if not word_text or word_text.lower() in {"text", "word", "kata"}:
+        return []
     input_text = clean_text(example)
+    if not clean_text(meaning):
+        built = instruction_row(
+            "Catat kosakata Bahasa Indonesia berikut.",
+            word_text,
+            input_text=word_text,
+            source=source,
+            task_type="indonesian_vocabulary_entry",
+        )
+        return [built] if built else []
+
     built = instruction_row(
-        f"Jelaskan arti kata atau ungkapan berikut: {normalize_text(word)}",
+        f"Jelaskan arti kata atau ungkapan berikut: {word_text}",
         clean_text(meaning),
         input_text=input_text,
         source=source,
