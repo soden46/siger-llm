@@ -45,6 +45,11 @@ class SigerRouter:
     def route(self, text: str, max_new_tokens: int = 80) -> RoutedResponse:
         intent = self.detect_intent(text)
 
+        if intent == "lampung_reason":
+            lampung_text = self._extract_lampung_text(text)
+            response = self.lampung.reason_lo_to_id(lampung_text, max_new_tokens=max_new_tokens)
+            return self._from_lampung(response, "lampung_reason")
+
         if intent == "lampung_to_id":
             response = self.lampung.translate("Lampung O", "Bahasa Indonesia", text)
             return self._from_lampung(response, "lampung_to_id")
@@ -78,6 +83,9 @@ class SigerRouter:
             if self.looks_lampung(normalized):
                 return "lampung_to_id"
 
+        if self._is_lampung_reason_request(normalized):
+            return "lampung_reason"
+
         if self.looks_lampung(normalized):
             return "lampung_to_id"
 
@@ -94,6 +102,31 @@ class SigerRouter:
             text,
         ).strip()
         return cleaned or text
+
+    def _is_lampung_reason_request(self, text: str) -> bool:
+        if not self.looks_lampung(text):
+            return False
+
+        reason_markers = (
+            "jelaskan",
+            "penjelasan",
+            "struktur",
+            "susunan",
+            "pola kalimat",
+            "kata per kata",
+            "arti kata",
+            "makna",
+            "grammar",
+        )
+        return "lampung" in text and any(marker in text for marker in reason_markers)
+
+    def _extract_lampung_text(self, text: str) -> str:
+        for separator in (":", "\n"):
+            if separator in text:
+                candidate = text.rsplit(separator, 1)[-1].strip()
+                if self.looks_lampung(self._norm(candidate)):
+                    return candidate
+        return text
 
     def _norm(self, text: str) -> str:
         return " ".join(text.strip().lower().split())

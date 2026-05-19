@@ -433,3 +433,22 @@ python -m py_compile tools\mine_general_assistant_data.py training\dataset_regis
 python -m py_compile tools\mine_indonesian_hf_mix.py
 python -m py_compile tools\ingest_kaggle_inputs.py
 ```
+
+## 11. Debug LoRA Instruction Mask
+
+Sebelum training LoRA besar di Kaggle, cek dulu apakah row JSONL sudah dibungkus ke format chat dan loss hanya dihitung pada jawaban assistant:
+
+```powershell
+python tools\debug_lora_dataset.py data\corpus\indonesian_hf_mix_plus_kaggle_reasoning_train.jsonl --limit 5 --max-seq-len 512
+```
+
+Catatan penting: file corpus SigerLM tidak perlu menyimpan token `<|assistant|>` secara mentah. Token itu ditambahkan oleh `lora/dataset.py` saat training. Karena itu, debug mask harus mengecek hasil formatter, bukan hanya `str(row)` dari JSONL.
+
+Untuk general chat, prioritaskan corpus instruction yang bersih dan sempit dulu. Dataset campuran text completion, reasoning, software, dan Lampung bisa dipakai nanti, tetapi model kecil 11.8M parameter lebih mudah stabil jika LoRA pertamanya fokus ke instruction-following umum.
+
+Training LoRA general assistant yang lebih fokus:
+
+```powershell
+python tools\build_instruction_corpus.py --registry configs\datasets\general_assistant_mining.json --max-row-tokens 2048
+python lora\run_lora.py --config configs\training\general_assistant_lora.json
+```

@@ -243,6 +243,11 @@ class InstructionDataset(Dataset):
         - Sebelum <|assistant|> => -100
         - Token assistant output => real token ids
         - Setelah <|end_turn|> assistant => -100
+
+        Catatan alignment:
+        labels menyimpan token target pada posisi aslinya. Trainer LoRA
+        melakukan causal shift logits[:, :-1] vs labels[:, 1:], sehingga
+        token <|assistant|> memprediksi token jawaban pertama.
         """
         labels = [self.IGNORE_INDEX] * len(input_ids)
 

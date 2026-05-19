@@ -9,6 +9,16 @@ from tokenizer.tokenizer import MultilingualTokenizer
 
 TokenizerBackend = Literal["auto", "tiktoken", "hf_bpe"]
 
+REQUIRED_SPECIAL_TOKENS = (
+    "<|system|>",
+    "<|user|>",
+    "<|assistant|>",
+    "<|end_turn|>",
+    "<|pad|>",
+    "<|bos|>",
+    "<|eos|>",
+)
+
 
 class HybridTokenizer:
     """
@@ -41,6 +51,7 @@ class HybridTokenizer:
         self.eos_id = self.impl.eos_id
         self.bos_id = self.impl.bos_id
         self.unk_id = self.impl.unk_id
+        self._validate_special_tokens()
 
     @staticmethod
     def _resolve_backend(backend: TokenizerBackend, hf_tokenizer_dir: str) -> str:
@@ -107,6 +118,33 @@ class HybridTokenizer:
 
     def __repr__(self):
         return f"HybridTokenizer(backend={self.backend}, vocab_size={self.vocab_size})"
+
+    def _validate_special_tokens(self) -> None:
+        missing = [
+            token
+            for token in REQUIRED_SPECIAL_TOKENS
+            if self.special_tokens.get(token) is None
+        ]
+        if missing:
+            raise RuntimeError(
+                f"Tokenizer backend={self.backend} missing special tokens: {missing}"
+            )
+
+        split_tokens: dict[str, list[int]] = {}
+        for token in REQUIRED_SPECIAL_TOKENS:
+            encoded = self.impl.encode(token)
+            expected_id = self.special_tokens[token]
+            if encoded != [expected_id]:
+                split_tokens[token] = encoded
+
+        if split_tokens:
+            details = ", ".join(
+                f"{token}->{ids}" for token, ids in split_tokens.items()
+            )
+            raise RuntimeError(
+                "Tokenizer special tokens are not encoded as single registered IDs "
+                f"for backend={self.backend}: {details}"
+            )
 
 
 def build_tokenizer(

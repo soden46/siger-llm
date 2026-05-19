@@ -8,7 +8,7 @@
   "batch_size": 1,
   "grad_accum": 4,
   "warmup_steps": 200,
-  "max_seq_len": 384,
+  "max_seq_len": 512,
   "weight_decay": 0.01,
   "device": "auto",
   "prefer_gpu": true,
@@ -19,13 +19,15 @@
   "max_global_batch_size": 16,
   "vram_safety_fraction": 0.75,
   "resource_target_fraction": 0.8,
-  "dataset_path": "data/corpus/general_instruction_train.jsonl",
+  "sharded_checkpoint": false,
+  "elastic_recovery": true,
+  "dataset_path": "data/corpus/general_assistant_mining_train.jsonl",
   "dataset_name": null,
   "dataset_split": "train",
   "max_samples": null,
   "base_checkpoint": "./checkpoints/best_model.pt",
-  "save_dir": "./checkpoints/lora/general",
+  "save_dir": "./checkpoints/lora/general_assistant",
   "save_every": 250,
   "log_interval": 10,
-  "merged_output": "./checkpoints/lora/model_general_merged.pt"
+  "merged_output": "./checkpoints/lora/model_general_assistant_merged.pt"
 }

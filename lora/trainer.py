@@ -134,13 +134,14 @@ class LoRATrainer:
 
         print(f"\n🚀 LoRA Training")
         print(f"   Dataset   : {len(dataset):,} examples")
-        print(f"   Max steps : {self.config.max_steps:,}")
+        print(f"   Max steps : {self.config.max_steps:,} optimizer updates")
         print(f"   Batch size: {self.config.batch_size} × {self.config.grad_accum} accum")
         print(f"   World size: {self.runtime.world_size}")
         print(f"   Eff. batch: {self.config.batch_size * self.config.grad_accum * max(1, self.runtime.world_size)}\n")
 
         self.model.train()
-        step = 0
+        optimizer_step = 0
+        micro_step = 0
         tokens_since_step = 0
         last_step_time = time.time()
         self.optimizer.zero_grad(set_to_none=True)
@@ -152,11 +153,11 @@ class LoRATrainer:
         )
         last_loss = float("inf")
 
-        while step < self.config.max_steps:
+        while optimizer_step < self.config.max_steps:
             if self.runtime.is_distributed and hasattr(loader.sampler, "set_epoch"):
-                loader.sampler.set_epoch(step)
+                loader.sampler.set_epoch(optimizer_step)
             for batch in loader:
-                if step >= self.config.max_steps or (elastic_state and elastic_state.should_stop):
+                if optimizer_step >= self.config.max_steps or (elastic_state and elastic_state.should_stop):
                     break
 
                 input_ids = batch["input_ids"].to(self.device, non_blocking=self.runtime.pin_memory)
@@ -175,6 +176,11 @@ class LoRATrainer:
                 ):
                     logits, _ = self.model(input_ids)
 
+                    # Causal LM alignment:
+                    # logits[:, t] predicts input_ids[:, t + 1]. InstructionDataset
+                    # marks assistant answer tokens at their original positions, so
+                    # labels must be shifted left here. Removing this shift would
+                    # train the model to predict tokens it already received.
                     shift_logits = logits[:, :-1, :].contiguous()
                     shift_labels = labels[:, 1:].contiguous()
 
@@ -187,8 +193,9 @@ class LoRATrainer:
                     loss = loss / self.config.grad_accum
                 scaler.scale(loss).backward()
                 last_loss = loss.item() * self.config.grad_accum
+                micro_step += 1
 
-                if (step + 1) % self.config.grad_accum == 0:
+                if micro_step % self.config.grad_accum == 0:
                     scaler.unscale_(self.optimizer)
                     torch.nn.utils.clip_grad_norm_(
                         self.model.parameters(), 1.0
@@ -197,6 +204,7 @@ class LoRATrainer:
                     scaler.update()
                     self.optimizer.zero_grad(set_to_none=True)
                     lr = self.scheduler.step()
+                    optimizer_step += 1
 
                     now = time.time()
                     elapsed = max(now - last_step_time, 1e-9)
@@ -206,26 +214,28 @@ class LoRATrainer:
 
                     if self.runtime.is_main_process:
                         self.logger.log(
-                            step,
+                            optimizer_step,
                             last_loss,
                             lr,
                             tokens_per_sec=tokens_per_sec,
                         )
 
-                    if self.runtime.is_main_process and step > 0 and step % self.config.save_every == 0:
-                        self._save(step, last_loss)
+                    if (
+                        self.runtime.is_main_process
+                        and optimizer_step > 0
+                        and optimizer_step % self.config.save_every == 0
+                    ):
+                        self._save(optimizer_step, last_loss)
                         if self.config.sharded_checkpoint:
                             save_sharded_checkpoint(
                                 model=self.model,
                                 optimizer=self.optimizer,
                                 scheduler=self.scheduler,
-                                output_dir=Path(self.config.save_dir) / f"sharded_step_{step:06d}",
-                                step=step,
+                                output_dir=Path(self.config.save_dir) / f"sharded_step_{optimizer_step:06d}",
+                                step=optimizer_step,
                                 loss=last_loss,
                                 config=self.config.__dict__,
                             )
-
-                step += 1
 
             if elastic_state and elastic_state.should_stop:
                 break
@@ -234,14 +244,14 @@ class LoRATrainer:
         if self.runtime.is_distributed:
             barrier()
         if self.runtime.is_main_process:
-            self._save(step, last_loss)
+            self._save(optimizer_step, last_loss)
             if self.config.sharded_checkpoint:
                 save_sharded_checkpoint(
                     model=self.model,
                     optimizer=self.optimizer,
                     scheduler=self.scheduler,
                     output_dir=Path(self.config.save_dir) / "sharded_final",
-                    step=step,
+                    step=optimizer_step,
                     loss=last_loss,
                     config=self.config.__dict__,
                 )
