@@ -38,6 +38,13 @@ For the current SigerLM experiments, keep the dense profile as the baseline:
 python main.py
 ```
 
+The default `small` profile uses `d_model=256`, `n_layers=8`, and `max_seq_len=128` for cheap smoke/base runs. If the dense baseline is stable and GPU time is available, use `small_context` to keep the same parameter scale while training with `max_seq_len=256`:
+
+```powershell
+$env:SIGER_MODEL_PROFILE="small_context"
+python main.py
+```
+
 Sparse MoE is opt-in and should be treated as a second experiment after the dense run is healthy:
 
 ```powershell

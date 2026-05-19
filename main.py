@@ -15,6 +15,7 @@ from optimization.gpu import maybe_relaunch_with_torchrun
 
 MODEL_PROFILES = {
     "small": {"d_model": 256, "n_layers": 8, "max_seq_len": 128},
+    "small_context": {"d_model": 256, "n_layers": 8, "max_seq_len": 256},
     "small_moe": {
         "d_model": 256,
         "n_layers": 8,
@@ -33,15 +34,12 @@ MODEL_PROFILES = {
 # ── Config ──────────────────────────────────────────────────
 TRAIN_CONFIG = {
     # Model
-    # "vocab_size":    100277,
-    # "d_model":       512,
-    # "n_layers":      12,
+    # vocab_size is set from the tokenizer at runtime. Do not hardcode it here,
+    # otherwise checkpoint compatibility becomes confusing when tokenizer
+    # backend/vocab changes.
     
     # Model kecil dulu buat smoke test
     "model_profile": "small",
-    "vocab_size": 100271,
-    "d_model": 256,
-    "n_layers": 8,
     "d_state": 16,
     "expand": 2,
     "d_conv": 4,
@@ -66,7 +64,6 @@ TRAIN_CONFIG = {
     "max_auto_scale_factor": 2,
     "max_global_batch_size": 64,
     "max_per_device_batch_size": 16,
-    "max_seq_len": 128 ,
     "grad_accum_steps": 4,
     "max_chars_per_text_file": 8_000_000,
     "max_dataset_chunks": 200_000,
@@ -101,7 +98,7 @@ TRAIN_CONFIG = {
      # Optimizer
     "max_lr": 5e-4,
     "min_lr": 5e-5,
-    "warmup_steps": 100,
+    "warmup_steps": 200,
     "weight_decay": 0.1,
     "grad_clip": 1.0,
 

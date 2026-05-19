@@ -492,6 +492,71 @@ def dedupe_key(row: dict[str, Any]) -> tuple[str, str, str]:
     )
 
 
+def source_report_key(spec: HFDatasetSpec) -> str:
+    parts = [spec.name, spec.kind, spec.split or "", spec.config or ""]
+    return "::".join(parts)
+
+
+def load_existing_seen(path: Path) -> set[tuple[str, str, str]]:
+    seen: set[tuple[str, str, str]] = set()
+    if not path.exists():
+        return seen
+
+    with path.open("r", encoding="utf-8", errors="ignore") as f:
+        for line_number, line in enumerate(f, start=1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                print(f"Skip invalid existing JSON {path}:{line_number}")
+                continue
+            if isinstance(row, dict):
+                seen.add(dedupe_key(row))
+    return seen
+
+
+def load_offsets_from_report(path: Path | None) -> dict[str, int]:
+    if path is None or not path.exists():
+        return {}
+
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid resume report JSON: {path}: {exc}") from exc
+
+    offsets: dict[str, int] = {}
+    for item in data.get("sources", []):
+        if not isinstance(item, dict):
+            continue
+        next_start_offset = item.get("next_start_offset")
+        if next_start_offset is None:
+            next_start_offset = int(item.get("start_offset", 0) or 0) + int(item.get("scanned", 0) or 0)
+        offset = int(next_start_offset or 0)
+        if offset <= 0:
+            continue
+
+        name = normalize_text(item.get("name"))
+        kind = normalize_text(item.get("kind"))
+        split = normalize_text(item.get("split"))
+        config = normalize_text(item.get("config"))
+        key = "::".join([name, kind, split, config])
+        if name:
+            offsets[name] = max(offsets.get(name, 0), offset)
+        if name and kind:
+            offsets[key] = max(offsets.get(key, 0), offset)
+    return offsets
+
+
+def offset_for_source(spec: HFDatasetSpec, offsets: dict[str, int], default_offset: int = 0) -> int:
+    return max(
+        int(default_offset or 0),
+        offsets.get(source_report_key(spec), 0),
+        offsets.get(spec.name, 0),
+    )
+
+
 def sample_row_preview(row: dict[str, Any], *, max_chars: int = 120) -> dict[str, str]:
     preview: dict[str, str] = {}
     for key, value in row.items():
@@ -512,34 +577,50 @@ def mine_sources(
     streaming: bool,
     cot_ratio: float = 0.0,
     cot_mode: str = "auto",
+    append: bool = False,
+    dedupe_existing: bool = False,
+    resume_offsets: dict[str, int] | None = None,
+    start_row_per_source: int = 0,
 ) -> dict[str, Any]:
     instruction_output.parent.mkdir(parents=True, exist_ok=True)
     if text_output:
         text_output.parent.mkdir(parents=True, exist_ok=True)
 
-    seen: set[tuple[str, str, str]] = set()
+    seen: set[tuple[str, str, str]] = load_existing_seen(instruction_output) if dedupe_existing else set()
     report: dict[str, Any] = {
         "schema_version": "siger_instruction_v1",
         "cot_ratio": cot_ratio,
         "cot_mode": cot_mode,
+        "append": append,
+        "dedupe_existing": dedupe_existing,
         "sources": [],
         "total_instruction_rows": 0,
         "total_text_rows": 0,
     }
 
-    with instruction_output.open("w", encoding="utf-8") as out_jsonl:
-        text_handle = text_output.open("w", encoding="utf-8") if text_output else None
+    output_mode = "a" if append else "w"
+    with instruction_output.open(output_mode, encoding="utf-8") as out_jsonl:
+        text_handle = text_output.open(output_mode, encoding="utf-8") if text_output else None
         try:
             for spec in sources:
                 source_limit = spec.max_items if spec.max_items is not None else max_items_per_source
                 source_rows = 0
                 source_texts = 0
                 scanned = 0
+                skipped = 0
+                start_offset = offset_for_source(
+                    spec,
+                    resume_offsets or {},
+                    default_offset=start_row_per_source,
+                )
                 sample_keys: list[str] = []
                 sample_row: dict[str, str] = {}
-                print(f"Loading {spec.name} ({spec.kind})")
+                print(f"Loading {spec.name} ({spec.kind}) | start_offset={start_offset}")
                 try:
-                    for raw in iter_hf_rows(spec, streaming=streaming):
+                    for raw_index, raw in enumerate(iter_hf_rows(spec, streaming=streaming)):
+                        if raw_index < start_offset:
+                            skipped += 1
+                            continue
                         if not sample_keys:
                             sample_keys = sorted(str(key) for key in raw.keys())
                             sample_row = sample_row_preview(raw)
@@ -565,9 +646,14 @@ def mine_sources(
                         {
                             "name": spec.name,
                             "kind": spec.kind,
+                            "split": spec.split or "",
+                            "config": spec.config or "",
                             "rows": source_rows,
                             "texts": source_texts,
+                            "start_offset": start_offset,
+                            "skipped": skipped,
                             "scanned": scanned,
+                            "next_start_offset": start_offset + scanned,
                             "sample_keys": sample_keys,
                             "sample_row": sample_row,
                             "error": str(exc),
@@ -580,9 +666,14 @@ def mine_sources(
                     {
                         "name": spec.name,
                         "kind": spec.kind,
+                        "split": spec.split or "",
+                        "config": spec.config or "",
                         "rows": source_rows,
                         "texts": source_texts,
+                        "start_offset": start_offset,
+                        "skipped": skipped,
                         "scanned": scanned,
+                        "next_start_offset": start_offset + scanned,
                         "sample_keys": sample_keys,
                         "sample_row": sample_row if source_rows == 0 and source_texts == 0 else {},
                     }
@@ -616,6 +707,30 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--only-custom-sources", action="store_true")
     parser.add_argument("--cot-ratio", type=float, default=0.0, help="Convert this deterministic fraction of mined rows to CoT format.")
     parser.add_argument("--cot-mode", choices=["auto", "minimal"], default="auto")
+    parser.add_argument(
+        "--append",
+        action="store_true",
+        help="Append new rows to existing output files instead of overwriting them.",
+    )
+    parser.add_argument(
+        "--dedupe-existing",
+        action="store_true",
+        help="Load existing instruction output and skip duplicate instruction/input/output rows.",
+    )
+    parser.add_argument(
+        "--resume-from-report",
+        default=None,
+        help=(
+            "Previous hf_mix_report.json. Each source resumes after the previous "
+            "scanned raw-row count so phase-2 mining takes later rows."
+        ),
+    )
+    parser.add_argument(
+        "--start-row-per-source",
+        type=int,
+        default=0,
+        help="Skip this many raw rows at the start of every source before mining.",
+    )
     return parser.parse_args()
 
 
@@ -623,6 +738,7 @@ def main() -> None:
     args = parse_args()
     default_sources = list(DEFAULT_SOURCES)
     sources = list(args.source) if args.only_custom_sources else [*default_sources, *args.source]
+    resume_offsets = load_offsets_from_report(Path(args.resume_from_report)) if args.resume_from_report else {}
     report = mine_sources(
         sources,
         instruction_output=Path(args.instruction_output),
@@ -632,6 +748,10 @@ def main() -> None:
         streaming=not args.no_streaming,
         cot_ratio=args.cot_ratio,
         cot_mode=args.cot_mode,
+        append=args.append,
+        dedupe_existing=args.dedupe_existing,
+        resume_offsets=resume_offsets,
+        start_row_per_source=args.start_row_per_source,
     )
     report_path = Path(args.report_output)
     report_path.parent.mkdir(parents=True, exist_ok=True)

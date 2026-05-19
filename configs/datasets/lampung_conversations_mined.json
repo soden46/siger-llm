@@ -1,0 +1,17 @@
+{
+  "name": "lampung_conversations_mined",
+  "output_path": "data/corpus/lampung_conversations_mined_train.jsonl",
+  "shuffle_seed": 49,
+  "sources": [
+    {
+      "name": "translatelampung_conversation_mining",
+      "path": "data/mined/lampung/lampung_conversations_translated.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten umum yang juga memahami percakapan Bahasa Indonesia dan Bahasa Lampung.",
+      "metadata": {
+        "type": "lampung_conversation_translation"
+      }
+    }
+  ]
+}

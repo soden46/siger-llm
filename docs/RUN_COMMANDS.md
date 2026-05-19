@@ -81,11 +81,12 @@ SIGER_TEXT_SOURCES=data SIGER_TEXT_INCLUDE=*.txt SIGER_MAX_TEXT_FILES=8 python m
 Pilih kapasitas model base yang lebih kuat untuk reasoning jika VRAM/waktu cukup:
 
 ```bash
+SIGER_MODEL_PROFILE=small_context python main.py
 SIGER_MODEL_PROFILE=base python main.py
 SIGER_MODEL_PROFILE=reasoning_base python main.py
 ```
 
-Profile default tetap `small` agar smoke test Kaggle lebih aman. Profile `base` memakai `d_model=512`, `n_layers=12`; profile `reasoning_base` menaikkan context training ke `max_seq_len=512`.
+Profile default tetap `small` (`d_model=256`, `n_layers=8`, `max_seq_len=128`) agar smoke test Kaggle lebih aman. Profile `small_context` mempertahankan ukuran 11.8M tetapi menaikkan context training ke `max_seq_len=256`. Profile `base` memakai `d_model=512`, `n_layers=12`; profile `reasoning_base` menaikkan context training ke `max_seq_len=512`.
 
 ## 5. Build Dataset Lampung
 

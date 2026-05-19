@@ -283,6 +283,15 @@ Default dense path:
 SIGER_MODEL_PROFILE unset or "small"
 -> use_moe=False
 -> checkpoint-compatible dense SSM blocks
+-> d_model=256, n_layers=8, max_seq_len=128
+```
+
+Longer-context dense smoke path:
+
+```txt
+SIGER_MODEL_PROFILE="small_context"
+-> use_moe=False
+-> d_model=256, n_layers=8, max_seq_len=256
 ```
 
 MoE experiment path:

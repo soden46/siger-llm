@@ -258,6 +258,37 @@ Untuk smoke test kecil:
 python tools\mine_indonesian_hf_mix.py --max-items-per-source 200
 ```
 
+### Phase-2 mining tanpa mengulang row lama
+
+Untuk tahap awal, aman membatasi tiap source, misalnya `--max-items-per-source 60000`. Saat phase 2, jangan mulai lagi dari row awal. Gunakan report run sebelumnya sebagai offset, lalu append ke file output yang sama:
+
+```powershell
+python tools\mine_indonesian_hf_mix.py `
+  --max-items-per-source 60000 `
+  --resume-from-report data\mined\hf_indonesia\hf_mix_report.json `
+  --append `
+  --dedupe-existing
+```
+
+`--resume-from-report` membaca jumlah raw row yang sudah discan per source dari report sebelumnya. `--append` menambahkan hasil baru ke JSONL/TXT lama, sedangkan `--dedupe-existing` membaca JSONL lama dan melewati instruction/input/output yang sudah ada. Report baru akan menulis `start_offset`, `skipped`, `scanned`, dan `next_start_offset` untuk tiap source.
+
+Jika ingin membuat output phase 2 terpisah dulu:
+
+```powershell
+python tools\mine_indonesian_hf_mix.py `
+  --max-items-per-source 60000 `
+  --resume-from-report data\mined\hf_indonesia\hf_mix_report.json `
+  --instruction-output data\mined\hf_indonesia\indonesian_hf_mix_instruction_phase2.jsonl `
+  --text-output data\indonesian_hf_mix_phase2.txt `
+  --report-output data\mined\hf_indonesia\hf_mix_report_phase2.json
+```
+
+Untuk skip manual tanpa report:
+
+```powershell
+python tools\mine_indonesian_hf_mix.py --max-items-per-source 60000 --start-row-per-source 60000
+```
+
 Untuk menambahkan source custom:
 
 ```powershell
@@ -345,6 +376,57 @@ Untuk build corpus gabungan HF mix + Kaggle input + Lampung:
 ```powershell
 python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix_plus_kaggle.json
 ```
+
+## 7.3 Mining Percakapan Lampung dari Dataset Lokal
+
+Jika sudah ada hasil mining lokal di `data/mined/`, `data/kaggle/`, atau `data/corpus/`, gunakan tool ini untuk mengambil kandidat percakapan lalu menerjemahkan setiap baris ke backend `translatelampung.com`:
+
+```powershell
+python tools\mine_lampung_conversations.py --target-count 1000
+```
+
+Default input yang dibaca:
+
+```txt
+data/mined/instruction/*.jsonl
+data/mined/hf_indonesia/*.jsonl
+data/kaggle/*.jsonl
+data/corpus/*_train.jsonl
+```
+
+Tool akan mencari percakapan dari beberapa bentuk data:
+
+- `messages` atau `conversations`,
+- teks dengan marker pembicara seperti `A: ...` dan `B: ...`,
+- row instruction yang terlihat seperti Q&A/chat/customer support dan bisa dijadikan dialog dua giliran (`A: instruction`, `B: output`).
+
+Secara default, tool tidak mengubah semua instruction row menjadi percakapan agar data coding, reasoning, translation, dan vocabulary tidak ikut terseret sebagai dialog palsu. Kalau memang ingin mengambil semua pasangan `instruction`/`output`, aktifkan:
+
+```powershell
+python tools\mine_lampung_conversations.py --target-count 1000 --include-any-instruction-pairs
+```
+
+Output:
+
+```txt
+data/mined/lampung/lampung_conversations_translated.jsonl
+data/mined/lampung/lampung_conversations_checkpoint.json
+data/mined/lampung/lampung_conversations_report.json
+```
+
+Setiap kandidat percakapan menghasilkan row instruction untuk Dialek O (`abl`) dan Dialek A (`ljp`) jika kedua dialek diaktifkan. Gunakan `--dry-run` untuk menguji ekstraksi tanpa hit API:
+
+```powershell
+python tools\mine_lampung_conversations.py --target-count 10 --dry-run --fresh
+```
+
+Build corpus khusus hasil mining percakapan Lampung:
+
+```powershell
+python tools\build_instruction_corpus.py --registry configs\datasets\lampung_conversations_mined.json --max-row-tokens 512
+```
+
+Catatan etis dan teknis: tool ini memakai jeda default per baris dan per percakapan agar tidak agresif ke server pihak ketiga. Jika mendapat HTTP 429, tool otomatis cooldown dan melanjutkan dari checkpoint. Pastikan penggunaan sesuai aturan situs/API yang dipakai.
 
 ## 8. Build Corpus agar Bisa Dibaca SigerLM
 
@@ -472,6 +554,15 @@ tetap perlu dicek di dokumentasi Django sesuai versi yang dipakai.
 Porsi uncertainty seed sebaiknya kecil, sekitar 2-3% dari corpus instruction. Tujuannya membentuk kebiasaan jujur tentang tingkat keyakinan, bukan membuat model terlalu sering menolak tugas.
 
 Untuk model `small` 11.8M parameter, default base training lokal diset ke `max_steps=3000`, dan config LoRA reasoning mix diset ke 3000 optimizer updates agar run pertama tidak terlalu panjang. Jika loss sudah turun sehat dan output mulai koheren, lanjutkan eksperimen kedua dengan base/LoRA 5000 steps atau `--max-row-tokens 768`.
+
+Jika ingin base training dengan konteks lebih panjang tanpa menaikkan parameter model, gunakan profile dense `small_context`:
+
+```powershell
+$env:SIGER_MODEL_PROFILE="small_context"
+python main.py
+```
+
+Profile ini tetap `d_model=256` dan `n_layers=8`, tetapi menaikkan `max_seq_len` dari 128 ke 256. Pakai setelah run `small` stabil karena biaya trainingnya lebih besar.
 
 Untuk mencoba Sparse Mamba MoE tanpa merusak jalur dense lama, aktifkan profile opt-in saat base training:
 
