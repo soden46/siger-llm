@@ -93,6 +93,8 @@ Indonesian HF mix untuk eksperimen Kaggle:
 - `morissu/indonesian_corpus` sebagai raw text / text completion
 - `IndonesiaAI/translated-samples` sebagai translation
 - `kaitchup/opus-Indonesian-to-English` sebagai translation
+- `akahana/english-indonesia-wikimatrix` sebagai translation
+- `akahana/english-indonesia` sebagai translation/chat translation
 - `ermandmand/indonesian-simple-instruction-dataset` sebagai instruction sederhana
 - `IndonesiaAI/sft-dataset` sebagai SFT/instruction
 - `audichandra/bitext_customer_support_llm_dataset_indonesian` sebagai customer support instruction

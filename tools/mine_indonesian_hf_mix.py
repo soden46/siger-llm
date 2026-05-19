@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import re
 import sys
@@ -52,8 +53,10 @@ DEFAULT_SOURCES: list[HFDatasetSpec] = [
     HFDatasetSpec("hndrbrm/indonesia_vocabulary", "vocab"),
     HFDatasetSpec("abid/indonesia-medical-qna", "qa"),
     HFDatasetSpec("morissu/indonesian_corpus", "text"),
-    HFDatasetSpec("IndonesiaAI/translated-samples", "translation"),
+    HFDatasetSpec("IndonesiaAI/translated-samples", "instruction"),
     HFDatasetSpec("kaitchup/opus-Indonesian-to-English", "translation"),
+    HFDatasetSpec("akahana/english-indonesia-wikimatrix", "translation"),
+    HFDatasetSpec("akahana/english-indonesia", "translation"),
     HFDatasetSpec("ermandmand/indonesian-simple-instruction-dataset", "instruction"),
     HFDatasetSpec("IndonesiaAI/sft-dataset", "instruction"),
     HFDatasetSpec("audichandra/bitext_customer_support_llm_dataset_indonesian", "instruction"),
@@ -91,6 +94,42 @@ def flatten_texts(value: Any) -> Iterable[str]:
     text = normalize_text(value)
     if text:
         yield text
+
+
+def parse_mapping_string(value: Any) -> dict[str, Any] | None:
+    """Parse fields that store a dict as a string, e.g. '{"id": "...", "en": "..."}'."""
+    if isinstance(value, dict):
+        return value
+    if not isinstance(value, str):
+        return None
+
+    text = value.strip()
+    if not text or text[0] not in "{[":
+        return None
+
+    for parser in (json.loads, ast.literal_eval):
+        try:
+            parsed = parser(text)
+        except (ValueError, SyntaxError, json.JSONDecodeError):
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
+def split_parallel_text(value: Any) -> tuple[str, str]:
+    """Split translation pairs stored in one text field."""
+    text = clean_text(value)
+    if not text:
+        return "", ""
+
+    delimiters = ["###>", "##>", "|||", "\t"]
+    for delimiter in delimiters:
+        if delimiter in text:
+            left, right = text.split(delimiter, 1)
+            return clean_text(left), clean_text(right)
+
+    return "", ""
 
 
 def first_value(row: dict[str, Any], keys: list[str]) -> Any:
@@ -210,7 +249,7 @@ def row_to_instruction(row: dict[str, Any], source: str) -> list[dict[str, Any]]
     input_text = first_value(row, ["context", "input_text", "source", "text", "conversation", "history"])
     answer = first_value(row, [
         "output", "response", "answer", "completion", "target", "assistant", "assistant_message",
-        "agent", "agent_response", "reply", "label",
+        "agent", "agent_response", "reply", "label", "response_j",
     ])
     system_prompt = CUSTOMER_SUPPORT_SYSTEM_PROMPT if "customer" in source.lower() or "support" in source.lower() else DEFAULT_SYSTEM_PROMPT
     built = instruction_row(
@@ -241,19 +280,22 @@ def row_to_qa(row: dict[str, Any], source: str) -> list[dict[str, Any]]:
 
 def row_to_translation(row: dict[str, Any], source: str) -> list[dict[str, Any]]:
     translation = first_value(row, ["translation"])
-    if isinstance(translation, dict):
-        id_text = first_value(translation, ["id", "indonesian", "indonesia", "indo", "id_id", "source"])
-        en_text = first_value(translation, ["en", "english", "eng", "en_uk", "en_us", "target"])
+    translation_mapping = parse_mapping_string(translation)
+    if translation_mapping:
+        id_text = first_value(translation_mapping, ["id", "indonesian", "indonesia", "indo", "id_id", "source"])
+        en_text = first_value(translation_mapping, ["en", "english", "eng", "en_uk", "en_us", "target"])
     else:
         id_text, en_text = pair_from_known_keys(
             row,
             [
                 "id", "indonesian", "indonesia", "indo", "bahasa_indonesia", "text_id", "id_text",
                 "sentence_id", "source_id", "source", "input", "text_1", "text1", "kalimat_indonesia",
+                "question", "prompt",
             ],
             [
                 "en", "english", "eng", "bahasa_inggris", "text_en", "en_text", "sentence_en",
                 "target_en", "target", "output", "text_2", "text2", "kalimat_inggris",
+                "response", "answer", "completion",
             ],
         )
 
@@ -265,6 +307,7 @@ def row_to_translation(row: dict[str, Any], source: str) -> list[dict[str, Any]]
                 ("source_text", "target_text"),
                 ("input_text", "output_text"),
                 ("question", "answer"),
+                ("question", "response"),
             ]
             for left_key, right_key in pairs:
                 id_text, en_text = pair_from_known_keys(row, [left_key], [right_key])
@@ -272,7 +315,15 @@ def row_to_translation(row: dict[str, Any], source: str) -> list[dict[str, Any]]
                     break
 
         if not id_text or not en_text:
-            id_text, en_text = first_two_text_columns(row)
+            for key in ("text", "translation", "content", "sentence"):
+                id_text, en_text = split_parallel_text(first_value(row, [key]))
+                if id_text and en_text:
+                    break
+
+        if not id_text or not en_text:
+            left, right = first_two_text_columns(row)
+            split_left, split_right = split_parallel_text(left)
+            id_text, en_text = (split_left, split_right) if split_left and split_right else (left, right)
 
     id_text = clean_text(id_text)
     en_text = clean_text(en_text)
@@ -326,7 +377,17 @@ def row_to_text(row: dict[str, Any], source: str, *, min_chars: int) -> tuple[li
     for text in candidates:
         text = clean_text(text)
         if len(text) < min_chars:
+            id_text, en_text = split_parallel_text(text)
+            if id_text and en_text:
+                rows.extend(row_to_translation({"id": id_text, "en": en_text}, source))
             continue
+
+        id_text, en_text = split_parallel_text(text)
+        if id_text and en_text:
+            rows.extend(row_to_translation({"id": id_text, "en": en_text}, source))
+            texts.extend([id_text, en_text])
+            continue
+
         texts.append(text)
         words = text.split()
         if len(words) < 24:
@@ -411,6 +472,16 @@ def dedupe_key(row: dict[str, Any]) -> tuple[str, str, str]:
     )
 
 
+def sample_row_preview(row: dict[str, Any], *, max_chars: int = 120) -> dict[str, str]:
+    preview: dict[str, str] = {}
+    for key, value in row.items():
+        text = clean_text(value)
+        if len(text) > max_chars:
+            text = text[:max_chars].rstrip() + "..."
+        preview[str(key)] = text
+    return preview
+
+
 def mine_sources(
     sources: list[HFDatasetSpec],
     *,
@@ -445,11 +516,13 @@ def mine_sources(
                 source_texts = 0
                 scanned = 0
                 sample_keys: list[str] = []
+                sample_row: dict[str, str] = {}
                 print(f"Loading {spec.name} ({spec.kind})")
                 try:
                     for raw in iter_hf_rows(spec, streaming=streaming):
                         if not sample_keys:
                             sample_keys = sorted(str(key) for key in raw.keys())
+                            sample_row = sample_row_preview(raw)
                         rows, texts = convert_row(raw, spec, min_text_chars=min_text_chars)
                         scanned += 1
                         for row in rows:
@@ -476,6 +549,7 @@ def mine_sources(
                             "texts": source_texts,
                             "scanned": scanned,
                             "sample_keys": sample_keys,
+                            "sample_row": sample_row,
                             "error": str(exc),
                         }
                     )
@@ -490,6 +564,7 @@ def mine_sources(
                         "texts": source_texts,
                         "scanned": scanned,
                         "sample_keys": sample_keys,
+                        "sample_row": sample_row if source_rows == 0 and source_texts == 0 else {},
                     }
                 )
                 report["total_instruction_rows"] += source_rows
