@@ -1,0 +1,81 @@
+from __future__ import annotations
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class SparseMoE(nn.Module):
+    """Small top-k feed-forward MoE for SigerLM blocks.
+
+    This module is intentionally simple and local-device friendly. It keeps
+    the dense SSM path intact, then adds sparse expert capacity as a residual
+    branch. Only the selected top-k experts are evaluated for each token.
+    """
+
+    def __init__(
+        self,
+        d_model: int,
+        *,
+        num_experts: int = 8,
+        top_k: int = 2,
+        hidden_mult: int = 2,
+        dropout: float = 0.0,
+    ) -> None:
+        super().__init__()
+        if num_experts < 1:
+            raise ValueError("num_experts must be >= 1")
+        if top_k < 1 or top_k > num_experts:
+            raise ValueError("top_k must be in [1, num_experts]")
+
+        self.num_experts = int(num_experts)
+        self.top_k = int(top_k)
+        hidden_dim = int(d_model * hidden_mult)
+
+        self.gate = nn.Linear(d_model, num_experts, bias=False)
+        self.experts = nn.ModuleList(
+            [
+                nn.Sequential(
+                    nn.Linear(d_model, hidden_dim, bias=False),
+                    nn.SiLU(),
+                    nn.Linear(hidden_dim, d_model, bias=False),
+                )
+                for _ in range(num_experts)
+            ]
+        )
+        self.dropout = nn.Dropout(dropout)
+        self.last_aux_loss: torch.Tensor | None = None
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        batch, seq_len, d_model = x.shape
+        flat_x = x.reshape(batch * seq_len, d_model)
+
+        gate_logits = self.gate(flat_x)
+        top_values, top_indices = torch.topk(gate_logits, self.top_k, dim=-1)
+        top_weights = F.softmax(top_values, dim=-1)
+
+        flat_out = torch.zeros_like(flat_x)
+        for expert_idx, expert in enumerate(self.experts):
+            mask = top_indices == expert_idx
+            if not mask.any():
+                continue
+
+            token_indices, route_slots = mask.nonzero(as_tuple=True)
+            expert_input = flat_x.index_select(0, token_indices)
+            expert_output = expert(expert_input)
+            weights = top_weights[token_indices, route_slots].unsqueeze(-1)
+            flat_out.index_add_(0, token_indices, expert_output * weights)
+
+        self.last_aux_loss = self._load_balance_loss(gate_logits, top_indices)
+        return self.dropout(flat_out.reshape(batch, seq_len, d_model))
+
+    def _load_balance_loss(
+        self,
+        gate_logits: torch.Tensor,
+        top_indices: torch.Tensor,
+    ) -> torch.Tensor:
+        gate_probs = F.softmax(gate_logits, dim=-1)
+        importance = gate_probs.mean(dim=0)
+        selected = F.one_hot(top_indices, num_classes=self.num_experts).float()
+        load = selected.sum(dim=1).mean(dim=0) / float(self.top_k)
+        return self.num_experts * torch.sum(importance * load)

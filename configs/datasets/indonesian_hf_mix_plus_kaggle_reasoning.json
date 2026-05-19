@@ -63,6 +63,16 @@
       "metadata": {
         "type": "software_engineering_capability"
       }
+    },
+    {
+      "name": "siger_uncertainty_seed",
+      "path": "data/capabilities/uncertainty_seed.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI yang jujur tentang batas pengetahuan dan tidak mengarang jika informasi tidak cukup.",
+      "metadata": {
+        "type": "uncertainty_awareness"
+      }
     }
   ]
 }

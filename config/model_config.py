@@ -55,6 +55,15 @@ class SigerConfig:
     model_alias: str | None = None
     model_base_name: str = field(init=False, default=SIGER_BASE_NAME)
 
+    # Optional Sparse Mamba MoE branch. Disabled by default for checkpoint
+    # compatibility; enable through the small_moe profile or explicit config.
+    use_moe: bool = False
+    moe_num_experts: int = 8
+    moe_top_k: int = 2
+    moe_expert_hidden_mult: int = 2
+    moe_layers_every: int = 2
+    moe_aux_loss_weight: float = 0.01
+
     def __post_init__(self):
         self.activation = self.activation.lower()
         if self.activation not in {"silu", "swish", "gelu", "relu"}:
@@ -65,6 +74,12 @@ class SigerConfig:
         if self.dt_rank == "auto":
             d_inner = self.d_model * self.expand
             self.dt_rank = max(1, d_inner // 16)
+        if self.moe_num_experts < 1:
+            raise ValueError("moe_num_experts must be >= 1")
+        if self.moe_top_k < 1 or self.moe_top_k > self.moe_num_experts:
+            raise ValueError("moe_top_k must be in [1, moe_num_experts]")
+        if self.moe_layers_every < 1:
+            raise ValueError("moe_layers_every must be >= 1")
         self.model_base_name = SIGER_BASE_NAME
         self.model_alias = canonical_model_name(self.model_alias)
 
@@ -88,6 +103,14 @@ class SigerConfig:
             d_inner * self.d_state +
             d_inner * self.d_model
         )
+        if self.use_moe:
+            moe_layers = self.n_layers // max(1, self.moe_layers_every)
+            moe_hidden = self.d_model * self.moe_expert_hidden_mult
+            per_moe_layer = (
+                self.d_model * self.moe_num_experts +
+                self.moe_num_experts * (self.d_model * moe_hidden + moe_hidden * self.d_model)
+            )
+            per_block += (moe_layers * per_moe_layer) / max(1, self.n_layers)
         embedding = self.vocab_size * self.d_model
         total     = embedding + (per_block * self.n_layers)
         if total < 1e6:
@@ -124,6 +147,19 @@ class SigerConfig:
         return cls(d_model=256, n_layers=8, max_seq_len=1024)
 
     @classmethod
+    def small_moe(cls) -> "SigerConfig":
+        return cls(
+            d_model=256,
+            n_layers=8,
+            max_seq_len=1024,
+            use_moe=True,
+            moe_num_experts=8,
+            moe_top_k=2,
+            moe_expert_hidden_mult=2,
+            moe_layers_every=2,
+        )
+
+    @classmethod
     def base(cls) -> "SigerConfig":
         return cls(d_model=512, n_layers=12, max_seq_len=2048)
 
@@ -142,6 +178,7 @@ class SigerConfig:
             f"  d_inner       = {self.d_inner}\n"
             f"  dt_rank       = {self.dt_rank}\n"
             f"  max_seq_len   = {self.max_seq_len}\n"
+            f"  use_moe       = {self.use_moe}\n"
             f"  approx_params = {self.model_size_approx}\n"
             f")"
         )

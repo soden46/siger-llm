@@ -5,6 +5,7 @@ import torch.nn.functional as F
 
 from model.ssm_core import SSMCore
 from model.norms import build_norm
+from model.moe import SparseMoE
 
 
 def _activation_fn(name: str):
@@ -23,9 +24,10 @@ class SSMBlock(nn.Module):
     Full Mamba block dengan gating mechanism.
     Analoginya ke Laravel: ini satu 'middleware' dalam pipeline.
     """
-    def __init__(self, config):
+    def __init__(self, config, layer_idx: int = 0):
         super().__init__()
         d_inner = config.d_model * config.expand
+        self.layer_idx = layer_idx
 
         self.norm = build_norm(
             config.d_model,
@@ -51,6 +53,24 @@ class SSMBlock(nn.Module):
         # Output projection
         self.out_proj = nn.Linear(d_inner, config.d_model, bias=False)
         self.dropout = nn.Dropout(config.dropout)
+        self.last_moe_loss = None
+
+        moe_every = max(1, int(getattr(config, "moe_layers_every", 1)))
+        self.use_moe = bool(getattr(config, "use_moe", False)) and ((layer_idx + 1) % moe_every == 0)
+        if self.use_moe:
+            self.moe_norm = build_norm(
+                config.d_model,
+                norm_type=getattr(config, "norm_type", "rmsnorm"),
+                eps=getattr(config, "norm_eps", 1e-6),
+                bias=getattr(config, "norm_bias", False),
+            )
+            self.moe = SparseMoE(
+                config.d_model,
+                num_experts=int(getattr(config, "moe_num_experts", 8)),
+                top_k=int(getattr(config, "moe_top_k", 2)),
+                hidden_mult=int(getattr(config, "moe_expert_hidden_mult", 2)),
+                dropout=float(getattr(config, "dropout", 0.0)),
+            )
 
     def forward(self, x):
         residual = x
@@ -73,4 +93,12 @@ class SSMBlock(nn.Module):
 
         # Output projection + residual
         out = self.out_proj(y)
-        return self.dropout(out) + residual
+        out = self.dropout(out) + residual
+
+        if self.use_moe:
+            out = out + self.moe(self.moe_norm(out))
+            self.last_moe_loss = self.moe.last_aux_loss
+        else:
+            self.last_moe_loss = None
+
+        return out

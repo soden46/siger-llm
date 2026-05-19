@@ -15,6 +15,17 @@ from optimization.gpu import maybe_relaunch_with_torchrun
 
 MODEL_PROFILES = {
     "small": {"d_model": 256, "n_layers": 8, "max_seq_len": 128},
+    "small_moe": {
+        "d_model": 256,
+        "n_layers": 8,
+        "max_seq_len": 128,
+        "use_moe": True,
+        "moe_num_experts": 8,
+        "moe_top_k": 2,
+        "moe_expert_hidden_mult": 2,
+        "moe_layers_every": 2,
+        "moe_aux_loss_weight": 0.01,
+    },
     "base": {"d_model": 512, "n_layers": 12, "max_seq_len": 256},
     "reasoning_base": {"d_model": 512, "n_layers": 12, "max_seq_len": 512},
 }
@@ -172,6 +183,12 @@ def main():
         initializer_range=TRAIN_CONFIG.get("initializer_range", 0.02),
         residual_scale_init=TRAIN_CONFIG.get("residual_scale_init", True),
         gradient_checkpointing=TRAIN_CONFIG.get("gradient_checkpointing", False),
+        use_moe=TRAIN_CONFIG.get("use_moe", False),
+        moe_num_experts=TRAIN_CONFIG.get("moe_num_experts", 8),
+        moe_top_k=TRAIN_CONFIG.get("moe_top_k", 2),
+        moe_expert_hidden_mult=TRAIN_CONFIG.get("moe_expert_hidden_mult", 2),
+        moe_layers_every=TRAIN_CONFIG.get("moe_layers_every", 2),
+        moe_aux_loss_weight=TRAIN_CONFIG.get("moe_aux_loss_weight", 0.01),
     )
     TRAIN_CONFIG["d_inner"] = model_config.d_inner
     TRAIN_CONFIG["d_state"] = model_config.d_state

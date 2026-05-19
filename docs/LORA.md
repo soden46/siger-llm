@@ -62,12 +62,32 @@ max_steps: 5000
 max_seq_len: 384
 ```
 
+Indonesian HF mix + Kaggle + reasoning + uncertainty:
+
+```txt
+configs/training/indonesian_hf_mix_plus_kaggle_reasoning_lora.json
+dataset_path: data/corpus/indonesian_hf_mix_plus_kaggle_reasoning_train.jsonl
+merged_output: checkpoints/lora/model_indonesian_hf_mix_plus_kaggle_reasoning_merged.pt
+max_steps: 3000
+max_seq_len: 512
+```
+
 ## Build Data Before Training
 
 ```powershell
 python tools\build_instruction_corpus.py --registry configs\datasets\lampung_instruction.json
 python tools\build_instruction_corpus.py --registry configs\datasets\general_instruction.json
 python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix.json
+```
+
+For the current mixed Kaggle recipe:
+
+```powershell
+python tools\build_software_engineering_seed.py
+python tools\build_reasoning_seed.py
+python tools\build_uncertainty_seed.py
+python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix_plus_kaggle_reasoning.json --max-row-tokens 512
+python tools\inspect_lora_dataset.py data\corpus\indonesian_hf_mix_plus_kaggle_reasoning_train.jsonl --limit 10 --stats-limit 500 --max-seq-len 512
 ```
 
 ## Dataset Formatting
@@ -87,6 +107,16 @@ It formats them as:
 ```
 
 Only assistant tokens contribute to the loss. System/user tokens are masked with `-100`.
+
+`lora/trainer.py` uses normal causal LM alignment:
+
+```txt
+logits[:, :-1] predicts labels[:, 1:]
+```
+
+`lora/dataset.py` stores labels at their original token positions, so the trainer shift lets the `<|assistant|>` position predict the first answer token. Do not remove this shift unless the dataset label semantics are changed everywhere.
+
+Reasoning and uncertainty rows may include `<thought>...</thought>` inside the assistant output. These tokens are supervised like normal assistant text. The goal is to teach structured reasoning and honest confidence statements, not to make the model refuse ordinary tasks.
 
 ## LoRA Targets
 

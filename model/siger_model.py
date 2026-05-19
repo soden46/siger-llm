@@ -24,7 +24,7 @@ class SigerLM(nn.Module):
 
         # Stack N SSM blocks
         self.layers = nn.ModuleList([
-            SSMBlock(config) for _ in range(config.n_layers)
+            SSMBlock(config, layer_idx=i) for i in range(config.n_layers)
         ])
 
         # Final normalization sebelum LM head
@@ -117,5 +117,14 @@ class SigerLM(nn.Module):
                 targets.reshape(-1),
                 ignore_index=-100,
             )
+            moe_aux_weight = float(getattr(self.config, "moe_aux_loss_weight", 0.0))
+            if moe_aux_weight > 0:
+                aux_losses = [
+                    layer.last_moe_loss
+                    for layer in self.layers
+                    if getattr(layer, "last_moe_loss", None) is not None
+                ]
+                if aux_losses:
+                    loss = loss + moe_aux_weight * torch.stack(aux_losses).mean()
 
         return logits, loss

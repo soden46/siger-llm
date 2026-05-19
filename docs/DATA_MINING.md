@@ -283,6 +283,32 @@ vocab
 Kalau salah satu dataset gagal load karena schema, akses, atau dependency HF, tool akan mencatat error di report dan lanjut ke dataset berikutnya.
 Report HF mix juga mencatat `sample_keys` untuk membantu memperbaiki source yang menghasilkan `0 rows`.
 
+### Normalisasi otomatis HF mix
+
+`tools/mine_indonesian_hf_mix.py` sekarang dibuat lebih toleran terhadap schema dataset HuggingFace yang tidak seragam. Semua output tetap dinormalisasi ke schema SigerLM:
+
+```json
+{"instruction":"...","input":"...","output":"...","system":"...","source":"...","type":"..."}
+```
+
+Normalizer saat ini menangani pola umum berikut:
+
+- translation berbentuk dict, misalnya `{"id":"...","en":"..."}`,
+- translation berbentuk stringified dict di satu kolom, misalnya `"{'id': '...', 'en': '...'}"`,
+- pasangan teks satu kolom dengan delimiter seperti `###>`, `##>`, `|||`, atau tab,
+- dataset instruction/chat dengan field `messages`, `conversations`, `question`, `response_j`, `response`, `answer`, atau `output`,
+- customer support CSV-like dengan kolom generik `column3` sebagai instruction dan `column4` sebagai response,
+- slang/vocabulary dengan pasangan `slang` dan `formal`,
+- vocabulary satu kolom `text` untuk contoh kosakata ringan.
+
+Kalau sebuah source tetap menghasilkan `0 rows`, cek `sample_keys`, `sample_row`, dan `error` di:
+
+```txt
+data/mined/hf_indonesia/hf_mix_report.json
+```
+
+Tujuannya bukan membuat model menghafal semua format dataset, tetapi memastikan pipeline mining bisa membaca sebanyak mungkin source lalu mengubahnya ke format instruction yang konsisten.
+
 ## 7.2 Ingest Kaggle Add Input Lokal
 
 Dataset yang ditambahkan dari panel **Add Input** Kaggle tersedia di `/kaggle/input`, tetapi tidak otomatis ikut training. Gunakan tool ini untuk scan file `.txt`, `.csv`, `.json`, dan `.jsonl` lalu mengubahnya menjadi data lokal SigerLM:
@@ -424,11 +450,37 @@ Untuk eksperimen Kaggle 2x T4 dengan source lebih besar, gunakan run awal yang k
 
 ```powershell
 python tools\mine_indonesian_hf_mix.py --max-items-per-source 60000
+python tools\build_software_engineering_seed.py
+python tools\build_reasoning_seed.py
+python tools\build_uncertainty_seed.py
 python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix_plus_kaggle_reasoning.json --max-row-tokens 512
 python tools\inspect_lora_dataset.py data\corpus\indonesian_hf_mix_plus_kaggle_reasoning_train.jsonl --limit 10 --stats-limit 500 --max-seq-len 512
 ```
 
+`build_uncertainty_seed.py` bukan seed hard-refusal untuk semua hal yang tidak diketahui. Isinya pola "honest & helpful": model tetap mencoba membantu dengan asumsi eksplisit, koreksi miskonsepsi, checklist verifikasi, dan caveat sumber/versi. Hard refusal hanya dipakai untuk kasus yang memang berisiko seperti secret, kredensial, diagnosis pasti, atau klaim finansial pasti.
+
+Contoh gaya output uncertainty yang diharapkan:
+
+```txt
+<thought>User bertanya tentang framework yang berbeda. Saya bisa memetakan konsep umum,
+tetapi harus memberi caveat agar user memverifikasi dokumentasi sesuai versi.</thought>
+Jawaban: Di Django, padanan umum untuk membatasi akses user login adalah
+`@login_required`. Ini mirip tujuan auth middleware di Laravel, tetapi detailnya
+tetap perlu dicek di dokumentasi Django sesuai versi yang dipakai.
+```
+
+Porsi uncertainty seed sebaiknya kecil, sekitar 2-3% dari corpus instruction. Tujuannya membentuk kebiasaan jujur tentang tingkat keyakinan, bukan membuat model terlalu sering menolak tugas.
+
 Untuk model `small` 11.8M parameter, default base training lokal diset ke `max_steps=3000`, dan config LoRA reasoning mix diset ke 3000 optimizer updates agar run pertama tidak terlalu panjang. Jika loss sudah turun sehat dan output mulai koheren, lanjutkan eksperimen kedua dengan base/LoRA 5000 steps atau `--max-row-tokens 768`.
+
+Untuk mencoba Sparse Mamba MoE tanpa merusak jalur dense lama, aktifkan profile opt-in saat base training:
+
+```powershell
+$env:SIGER_MODEL_PROFILE="small_moe"
+python main.py
+```
+
+Profile default `small` tetap dense dan kompatibel dengan checkpoint lama. `small_moe` menambahkan sparse feed-forward experts pada sebagian layer (`8 experts`, `top_k=2`) dengan auxiliary load-balance loss kecil. Gunakan ini sebagai eksperimen kedua setelah dense baseline sehat.
 
 Contoh inspeksi cepat:
 

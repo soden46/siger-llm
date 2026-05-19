@@ -32,6 +32,21 @@ raw text
 
 If tokenizer backend changes, old checkpoints may not load because token IDs and embedding size can change.
 
+For the current SigerLM experiments, keep the dense profile as the baseline:
+
+```powershell
+python main.py
+```
+
+Sparse MoE is opt-in and should be treated as a second experiment after the dense run is healthy:
+
+```powershell
+$env:SIGER_MODEL_PROFILE="small_moe"
+python main.py
+```
+
+The `small_moe` profile keeps the same general SSM/Mamba-like core but adds sparse experts on selected blocks. It increases capacity without making Lampung, Laravel, or any domain rule part of the core model.
+
 ## Instruction Corpus Builder
 
 Unified instruction corpus builder:
@@ -82,6 +97,17 @@ Text completion source:
 }
 ```
 
+For Kaggle/general experiments, the main mixed registry is:
+
+```powershell
+python tools\build_software_engineering_seed.py
+python tools\build_reasoning_seed.py
+python tools\build_uncertainty_seed.py
+python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix_plus_kaggle_reasoning.json --max-row-tokens 512
+```
+
+Use `--max-row-tokens 512` for the first 11.8M-parameter LoRA run. Increase to `768` or `1024` only after label inspection and short training look healthy.
+
 ## LoRA Training
 
 LoRA runner:
@@ -108,6 +134,14 @@ python tools\build_instruction_corpus.py --registry configs\datasets\general_ins
 python lora\run_lora.py --config configs\training\general_lora.json
 ```
 
+Mixed Indonesian HF + Kaggle + reasoning + uncertainty LoRA:
+
+```powershell
+python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix_plus_kaggle_reasoning.json --max-row-tokens 512
+python tools\inspect_lora_dataset.py data\corpus\indonesian_hf_mix_plus_kaggle_reasoning_train.jsonl --limit 10 --stats-limit 500 --max-seq-len 512
+python lora\run_lora.py --config configs\training\indonesian_hf_mix_plus_kaggle_reasoning_lora.json
+```
+
 Default:
 
 ```powershell
@@ -115,6 +149,8 @@ python lora\run_lora.py
 ```
 
 The default remains Lampung-safe for backward compatibility.
+
+Before a long LoRA run, always inspect the assistant-only mask. Healthy rows should have supervised assistant tokens greater than zero, and the supervised preview should show answer text rather than the system/user prompt.
 
 ## Current Configs
 
@@ -140,6 +176,17 @@ data/corpus/general_instruction_train.jsonl: 30704 rows
 ```
 
 The general corpus is currently mostly Lampung plus tiny local text sources. For real general chatbot ability, add larger instruction/chat corpora to `configs/datasets/general_instruction.json`.
+
+## Data Method Notes
+
+Current data strategy is data-centric:
+
+- Normalize noisy HF/Kaggle schemas into the SigerLM instruction row.
+- Keep the core model general; encode Lampung/Laravel capability through data, adapters, routing, and retrieval.
+- Add reasoning rows using `<thought>...</thought>` for structured problem solving.
+- Add a small amount of uncertainty-awareness rows so the model can say what it knows, what it infers, and what needs verification.
+- Avoid hard-refusal for ordinary unknowns. Use helpful caveats and verification steps instead.
+- Keep hard refusal only for unsafe categories such as leaked secrets, credential handling, harmful instructions, medical diagnosis certainty, and financial certainty.
 
 ## CPU/VPS Tips
 

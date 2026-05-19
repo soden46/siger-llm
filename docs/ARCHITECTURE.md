@@ -275,6 +275,29 @@ Core numerical defaults for new checkpoints:
 
 Older checkpoints with LayerNorm bias are still detected by inference/LoRA loaders and loaded with `norm_type="layernorm"` for backward compatibility.
 
+Optional sparse capacity is available through the `small_moe` profile. This does not replace the dense baseline. It adds a Sparse Mamba MoE branch on selected SSM blocks so the model can test multiple feed-forward experts while keeping only `top_k` experts active per token.
+
+Default dense path:
+
+```txt
+SIGER_MODEL_PROFILE unset or "small"
+-> use_moe=False
+-> checkpoint-compatible dense SSM blocks
+```
+
+MoE experiment path:
+
+```txt
+SIGER_MODEL_PROFILE="small_moe"
+-> use_moe=True
+-> moe_num_experts=8
+-> moe_top_k=2
+-> moe_layers_every=2
+-> moe_aux_loss_weight=0.01
+```
+
+The MoE branch is still domain-neutral. It must not contain hard-coded Lampung, Laravel, or routing logic. Any specialization should emerge from data and adapter training, while explicit domain behavior remains in `retrieval/` and `inference/`.
+
 End-to-end forward pass:
 
 ```txt
@@ -306,6 +329,7 @@ Setiap `SSMBlock` berisi:
 6. gated multiplication
 7. `out_proj`
 8. residual connection
+9. optional sparse MoE residual branch jika `use_moe=True`
 
 Pseudocode:
 
@@ -321,6 +345,16 @@ y = y * silu(z_gate)
 out = out_proj(y)
 return dropout(out) + residual
 ```
+
+MoE pseudocode:
+
+```python
+if use_moe and layer_is_moe:
+    expert_out = sparse_moe(norm(hidden))
+    hidden = hidden + dropout(expert_out)
+```
+
+`SparseMoE` memakai gate per token, memilih `top_k` experts, lalu menambahkan auxiliary load-balance loss kecil saat training agar routing tidak jatuh ke satu expert saja.
 
 ## 8. SSM Core: Selective State Space
 
@@ -431,6 +465,19 @@ tools/build_reasoning_seed.py
 ```
 
 Reasoning examples use `<thought>...</thought>` before the final answer. `inference/generator.py` is thought-aware so generation does not stop while a thought tag is still open.
+
+Uncertainty-awareness data follows the same instruction-source rule:
+
+```txt
+tools/build_uncertainty_seed.py
+  -> data/capabilities/uncertainty_seed.jsonl
+  -> configs/datasets/indonesian_hf_mix_plus_kaggle_reasoning.json
+  -> tools/build_instruction_corpus.py
+  -> data/corpus/indonesian_hf_mix_plus_kaggle_reasoning_train.jsonl
+  -> lora/run_lora.py
+```
+
+Uncertainty examples are not blanket refusals. They train SigerLM to stay helpful while naming confidence level, assumptions, missing context, and verification steps. Hard refusal is reserved for genuinely risky requests such as secrets, unsafe instructions, diagnosis certainty, or financial certainty.
 
 ## 11. Lampung Dataset Architecture
 

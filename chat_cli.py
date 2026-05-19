@@ -46,6 +46,24 @@ def infer_config_from_state_dict(state_dict: dict) -> SigerConfig:
     if "layers.0.conv1d.weight" in state_dict:
         d_conv = state_dict["layers.0.conv1d.weight"].shape[-1]
     norm_type = "layernorm" if "norm_f.bias" in state_dict else "rmsnorm"
+    moe_layers = set()
+    moe_num_experts = 0
+    moe_expert_hidden_mult = 2
+    for key, value in state_dict.items():
+        match = re.match(r"layers\.(\d+)\.moe\.experts\.(\d+)\.0\.weight", key)
+        if match:
+            moe_layers.add(int(match.group(1)))
+            moe_num_experts = max(moe_num_experts, int(match.group(2)) + 1)
+            if hasattr(value, "shape") and len(value.shape) == 2:
+                moe_expert_hidden_mult = max(1, int(value.shape[0]) // d_model)
+
+    use_moe = bool(moe_layers)
+    moe_layers_every = 1
+    if len(moe_layers) >= 2:
+        sorted_layers = sorted(moe_layers)
+        moe_layers_every = max(1, sorted_layers[1] - sorted_layers[0])
+    elif len(moe_layers) == 1:
+        moe_layers_every = max(1, next(iter(moe_layers)) + 1)
 
     return SigerConfig(
         vocab_size=vocab_size,
@@ -57,6 +75,11 @@ def infer_config_from_state_dict(state_dict: dict) -> SigerConfig:
         max_seq_len=512,
         norm_type=norm_type,
         norm_bias=("norm_f.bias" in state_dict),
+        use_moe=use_moe,
+        moe_num_experts=moe_num_experts or 8,
+        moe_top_k=2,
+        moe_expert_hidden_mult=moe_expert_hidden_mult,
+        moe_layers_every=moe_layers_every,
     )
 
 
