@@ -49,7 +49,7 @@ TRAIN_CONFIG = {
     # "grad_accum_steps": 4,      # effective batch = 8 * 4 = 32
 
     # Training kecil
-    "max_steps": 1500,
+    "max_steps": 3000,
     "batch_size": 16,
     "auto_scale_batch": True,
     "max_auto_scale_factor": 2,

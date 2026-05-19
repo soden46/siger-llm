@@ -420,6 +420,16 @@ df -h /kaggle/working
 
 Untuk `mine_indonesian_hf_mix.py`, hindari langsung `--max-items-per-source 50000` kalau disk mulai mepet. Naikkan bertahap dari `200`, `5000`, `10000`, lalu baru `50000`.
 
+Untuk eksperimen Kaggle 2x T4 dengan source lebih besar, gunakan run awal yang konservatif:
+
+```powershell
+python tools\mine_indonesian_hf_mix.py --max-items-per-source 60000
+python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix_plus_kaggle_reasoning.json --max-row-tokens 512
+python tools\inspect_lora_dataset.py data\corpus\indonesian_hf_mix_plus_kaggle_reasoning_train.jsonl --limit 10 --stats-limit 500 --max-seq-len 512
+```
+
+Untuk model `small` 11.8M parameter, default base training lokal diset ke `max_steps=3000`, dan config LoRA reasoning mix diset ke 3000 optimizer updates agar run pertama tidak terlalu panjang. Jika loss sudah turun sehat dan output mulai koheren, lanjutkan eksperimen kedua dengan base/LoRA 5000 steps atau `--max-row-tokens 768`.
+
 Contoh inspeksi cepat:
 
 ```powershell
