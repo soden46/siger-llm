@@ -30,6 +30,42 @@ python lora\run_lora.py
 
 The default remains a Lampung-safe recipe for backward compatibility.
 
+## One-Command Curriculum Runner
+
+For automatic easy-to-hard LoRA training, use `train_pipeline.py`:
+
+```powershell
+python train_pipeline.py --mode lora-curriculum
+```
+
+Kaggle/CUDA example:
+
+```bash
+PYTORCH_ALLOC_CONF=expandable_segments:True python train_pipeline.py --mode lora-curriculum
+```
+
+The runner reads:
+
+```txt
+configs/training/lora_curriculum.json
+```
+
+It runs:
+
+```txt
+stage1_foundation -> stage2_general -> stage3_advanced -> stage4_full
+```
+
+For each stage it can rebuild the corpus, run `lora/run_lora.py`, merge the adapter, and then use that merged checkpoint as the base checkpoint for the next stage. Logs are written to `logs/lora_curriculum/`, and progress is written to `checkpoints/lora/curriculum_state.json`.
+
+Useful flags:
+
+```powershell
+python train_pipeline.py --mode lora-curriculum --dry-run
+python train_pipeline.py --mode lora-curriculum --no-rebuild-corpora
+python train_pipeline.py --mode lora-curriculum --force-curriculum
+```
+
 ## Current Training Configs
 
 Lampung:
@@ -69,7 +105,17 @@ configs/training/indonesian_hf_mix_plus_kaggle_reasoning_lora.json
 dataset_path: data/corpus/indonesian_hf_mix_plus_kaggle_reasoning_train.jsonl
 merged_output: checkpoints/lora/model_indonesian_hf_mix_plus_kaggle_reasoning_merged.pt
 max_steps: 3000
-max_seq_len: 512
+max_seq_len: 1024
+```
+
+Curriculum final:
+
+```txt
+configs/training/curriculum_stage4_full_lora.json
+dataset_path: data/corpus/curriculum_stage4_full_train.jsonl
+merged_output: checkpoints/lora/model_curriculum_stage4_full_merged.pt
+max_steps: 2000
+max_seq_len: 1024
 ```
 
 ## Build Data Before Training
@@ -88,6 +134,13 @@ python tools\build_reasoning_seed.py
 python tools\build_uncertainty_seed.py
 python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_hf_mix_plus_kaggle_reasoning.json --max-row-tokens 512
 python tools\inspect_lora_dataset.py data\corpus\indonesian_hf_mix_plus_kaggle_reasoning_train.jsonl --limit 10 --stats-limit 500 --max-seq-len 512
+```
+
+For the current curriculum recipe:
+
+```powershell
+python train_pipeline.py --mode lora-curriculum --dry-run
+python tools\debug_lora_dataset.py data\corpus\curriculum_stage4_full_train.jsonl --tokenizer auto --limit 3 --stats-limit 500 --max-seq-len 1024
 ```
 
 ## Dataset Formatting
@@ -144,5 +197,7 @@ checkpoints/lora/model_general_merged.pt
 
 ```powershell
 python -m py_compile lora\config.py lora\dataset.py lora\run_lora.py
+python -m py_compile train_pipeline.py
 python lora\run_lora.py --help
+python train_pipeline.py --mode lora-curriculum --dry-run
 ```

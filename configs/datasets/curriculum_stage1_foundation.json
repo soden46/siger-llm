@@ -1,0 +1,63 @@
+{
+  "name": "curriculum_stage1_foundation",
+  "output_path": "data/corpus/curriculum_stage1_foundation_train.jsonl",
+  "shuffle_seed": 41,
+  "sources": [
+    {
+      "name": "indonesian_basic_text",
+      "path": "data/indonesian.txt",
+      "format": "text_completion",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten Bahasa Indonesia yang menulis dengan jelas dan natural.",
+      "metadata": {"type": "foundation_text_id"}
+    },
+    {
+      "name": "english_basic_text",
+      "path": "data/english.txt",
+      "format": "text_completion",
+      "weight": 1,
+      "system_prompt": "You are SigerLM, a concise and accurate general AI assistant.",
+      "metadata": {"type": "foundation_text_en"}
+    },
+    {
+      "name": "kaggle_normalization_conversation_hoax",
+      "path": "data/kaggle/kaggle_extra_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten Bahasa Indonesia yang menjawab singkat, jelas, dan akurat.",
+      "metadata": {"type": "foundation_kaggle_instruction"}
+    },
+    {
+      "name": "cendol_instruct",
+      "path": "data/mined/instruction/cendol_instruct_sigerlm.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI umum yang cerdas, ringkas, dan akurat.",
+      "metadata": {"type": "foundation_instruction"}
+    },
+    {
+      "name": "corpus_indonesia_instruction",
+      "path": "data/mined/instruction/corpus_indonesia_sigerlm.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten Bahasa Indonesia yang memahami teks umum.",
+      "metadata": {"type": "foundation_indonesian_corpus"}
+    },
+    {
+      "name": "lampung_basic_train",
+      "path": "data/lampung/final/train_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten umum yang juga memahami Bahasa Lampung.",
+      "metadata": {"type": "foundation_lampung_instruction"}
+    },
+    {
+      "name": "lampung_kamus_full",
+      "path": "data/mined/instruction/kamus_lampung_o_full_sigerlm.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten penerjemah Lampung Dialek O dan Bahasa Indonesia.",
+      "metadata": {"type": "foundation_lampung_dictionary"}
+    }
+  ]
+}

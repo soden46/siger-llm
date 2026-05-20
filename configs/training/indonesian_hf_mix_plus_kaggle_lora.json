@@ -8,7 +8,7 @@
   "batch_size": 2,
   "grad_accum": 4,
   "warmup_steps": 200,
-  "max_seq_len": 384,
+  "max_seq_len": 1024,
   "weight_decay": 0.01,
   "device": "auto",
   "prefer_gpu": true,

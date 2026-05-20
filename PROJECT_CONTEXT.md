@@ -9,9 +9,11 @@ SigerLM is a custom Python LLM framework built around a State Space Model/Mamba-
 The system currently supports:
 
 - custom SSM language model
+- modality-agnostic backbone entrypoint through projected embeddings
 - hybrid tokenizer selection
 - base training pipeline
 - config-driven LoRA fine-tuning
+- one-command LoRA curriculum runner
 - unified instruction corpus builder
 - Lampung dataset extraction and instruction generation
 - lookup-first Lampung inference
@@ -25,7 +27,7 @@ data sources
   -> domain builders or dataset registry
   -> unified instruction corpus
   -> tokenizer
-  -> base model / LoRA training
+  -> base model / LoRA training / LoRA curriculum
   -> merged checkpoint
   -> inference router
   -> general chat or Lampung tools
@@ -43,6 +45,8 @@ The model architecture is general. Lampung is implemented as a domain layer:
 
 Do not put domain-specific Lampung behavior into `model/`.
 
+Do not put modality-specific preprocessing, decoder heads, or task losses into the SSM core. Non-text inputs should be projected by `modalities/` adapters and passed into `SigerLM.forward_hidden(inputs_embeds=...)`. The roadmap is in `docs/MODALITY_AGNOSTIC_BACKBONE.md`.
+
 ## Important Modules
 
 ```txt
@@ -50,6 +54,8 @@ config/model_config.py
 model/siger_model.py
 model/ssm_block.py
 model/ssm_core.py
+modalities/base.py
+modalities/registry.py
 tokenizer/hybrid_tokenizer.py
 training/dataset.py
 training/dataset_registry.py
@@ -70,8 +76,14 @@ retrieval/compositional_translator.py
 ```txt
 configs/datasets/lampung_instruction.json
 configs/datasets/general_instruction.json
+configs/datasets/curriculum_stage1_foundation.json
+configs/datasets/curriculum_stage2_general.json
+configs/datasets/curriculum_stage3_advanced.json
+configs/datasets/curriculum_stage4_full.json
 configs/training/lampung_lora.json
 configs/training/general_lora.json
+configs/training/lora_curriculum.json
+configs/training/curriculum_stage*_lora.json
 ```
 
 ## Current Dataset State
@@ -87,6 +99,11 @@ data/lampung/final/test.jsonl: 541 rows
 data/lampung/final/train_augmented_instruction.jsonl: 32059 rows
 data/corpus/lampung_instruction_train.jsonl: 30701 rows
 data/corpus/general_instruction_train.jsonl: 30704 rows
+data/corpus/kaggle_local_inputs_train.jsonl: 51969 rows
+data/corpus/curriculum_stage1_foundation_train.jsonl: 84605 rows
+data/corpus/curriculum_stage2_general_train.jsonl: 186672 rows
+data/corpus/curriculum_stage3_advanced_train.jsonl: 218596 rows
+data/corpus/curriculum_stage4_full_train.jsonl: 218596 rows
 ```
 
 `general_instruction_train.jsonl` is currently still dominated by Lampung because local general text files are small. To make SigerLM more general, add larger instruction/chat/text sources to `configs/datasets/general_instruction.json`.
@@ -114,6 +131,13 @@ Train LoRA:
 ```powershell
 python lora\run_lora.py --config configs\training\lampung_lora.json
 python lora\run_lora.py --config configs\training\general_lora.json
+python train_pipeline.py --mode lora-curriculum
+```
+
+Preview automatic LoRA curriculum without training:
+
+```powershell
+python train_pipeline.py --mode lora-curriculum --dry-run
 ```
 
 Run CLI:
@@ -148,7 +172,7 @@ Source: exact instruction lookup
 
 1. Expand general instruction/chat corpora.
 2. Keep Lampung domain as an adapter, not the whole architecture.
-3. Train/evaluate `general_lora.json` once general corpus is meaningful.
+3. Train/evaluate the easy-to-hard LoRA curriculum once base checkpoint/tokenizer are aligned.
 4. Add small automated tests for corpus builder, router, and lookup.
 5. Improve evaluation coverage for Lampung ID/EN and general chat.
 6. Keep CPU/VPS memory use under control.

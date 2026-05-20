@@ -33,7 +33,7 @@ pip install -r requirements.txt
 
 ```powershell
 python -m py_compile chat_cli.py inference\router.py inference\lampung_pipeline.py retrieval\instruction_lookup.py retrieval\compositional_translator.py
-python -m py_compile training\dataset_registry.py tools\build_instruction_corpus.py lora\config.py lora\dataset.py lora\run_lora.py
+python -m py_compile training\dataset_registry.py tools\build_instruction_corpus.py lora\config.py lora\dataset.py lora\run_lora.py train_pipeline.py
 python -m py_compile tools\mine_general_assistant_data.py
 python -m py_compile tools\mine_indonesian_hf_mix.py
 ```
@@ -92,6 +92,24 @@ Adaptive dense -> MoE -> LoRA pipeline:
 
 ```powershell
 python train_pipeline.py --lora-config configs\training\general_lora.json
+```
+
+Automatic easy-to-hard LoRA curriculum:
+
+```powershell
+python train_pipeline.py --mode lora-curriculum
+```
+
+Kaggle/CUDA:
+
+```bash
+PYTORCH_ALLOC_CONF=expandable_segments:True python train_pipeline.py --mode lora-curriculum
+```
+
+Preview without training:
+
+```powershell
+python train_pipeline.py --mode lora-curriculum --dry-run
 ```
 
 Default trigger:
@@ -162,6 +180,15 @@ General assistant mining corpus:
 python tools\build_instruction_corpus.py --registry configs\datasets\general_assistant_mining.json --max-row-tokens 2048
 ```
 
+Curriculum corpora:
+
+```powershell
+python tools\build_instruction_corpus.py --registry configs\datasets\curriculum_stage1_foundation.json --max-row-tokens 2048
+python tools\build_instruction_corpus.py --registry configs\datasets\curriculum_stage2_general.json --max-row-tokens 2048
+python tools\build_instruction_corpus.py --registry configs\datasets\curriculum_stage3_advanced.json --max-row-tokens 2048
+python tools\build_instruction_corpus.py --registry configs\datasets\curriculum_stage4_full.json --max-row-tokens 2048
+```
+
 ## 7. Mining Q&A, Reasoning, Code, dan Laravel
 
 Smoke kecil dulu:
@@ -226,6 +253,14 @@ Ingest dataset dari Kaggle Add Input:
 
 ```bash
 python tools/ingest_kaggle_inputs.py
+```
+
+The ingest step creates:
+
+```txt
+data/kaggle/kaggle_extra_instruction.jsonl
+data/kaggle/kaggle_extra_text.txt
+configs/datasets/kaggle_local_inputs.json
 ```
 
 Build corpus instruction:
@@ -302,6 +337,24 @@ df -h /kaggle/working
 
 ## 9. LoRA Training
 
+One-command curriculum LoRA:
+
+```powershell
+python train_pipeline.py --mode lora-curriculum
+```
+
+Resume/skip behavior is automatic: a stage is skipped when its merged output already exists. Force a full rerun:
+
+```powershell
+python train_pipeline.py --mode lora-curriculum --force-curriculum
+```
+
+Skip corpus rebuild when corpora are already built:
+
+```powershell
+python train_pipeline.py --mode lora-curriculum --no-rebuild-corpora
+```
+
 Lampung-only LoRA:
 
 ```powershell
@@ -355,6 +408,15 @@ python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_
 python lora\run_lora.py --config configs\training\indonesian_hf_mix_plus_kaggle_reasoning_lora.json
 ```
 
+Manual curriculum stages, if you do not want the one-command runner:
+
+```powershell
+python lora\run_lora.py --config configs\training\curriculum_stage1_foundation_lora.json
+python lora\run_lora.py --config configs\training\curriculum_stage2_general_lora.json
+python lora\run_lora.py --config configs\training\curriculum_stage3_advanced_lora.json
+python lora\run_lora.py --config configs\training\curriculum_stage4_full_lora.json
+```
+
 Config Indonesian HF mix memakai `batch_size=2` sebagai titik awal aman. Trainer LoRA bisa menaikkan batch secara konservatif lewat VRAM-aware tuning.
 
 Untuk cluster atau multi-process launch, runtime planner juga membaca environment `WORLD_SIZE`, `RANK`, dan `LOCAL_RANK`. Jalur ini dipakai jika training diluncurkan dengan `torchrun`.
@@ -371,6 +433,7 @@ Di Kaggle T4x2, command sederhana juga bisa:
 ```bash
 python main.py
 python lora/run_lora.py --config configs/training/indonesian_hf_mix_plus_kaggle_lora.json
+PYTORCH_ALLOC_CONF=expandable_segments:True python train_pipeline.py --mode lora-curriculum
 ```
 
 Default backward-compatible Lampung run:

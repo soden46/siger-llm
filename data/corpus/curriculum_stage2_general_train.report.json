@@ -1,0 +1,69 @@
+{
+  "registry": "curriculum_stage2_general",
+  "output_path": "data/corpus/curriculum_stage2_general_train.jsonl",
+  "max_row_tokens": 2048,
+  "strict_laravel_php": true,
+  "sources": [
+    {
+      "name": "stage1_foundation",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 84605
+    },
+    {
+      "name": "general_assistant_mining",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 31681
+    },
+    {
+      "name": "indonesian_general_instruction",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 600
+    },
+    {
+      "name": "indonesian_qa_instruction",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 200
+    },
+    {
+      "name": "slim_orca",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 6075
+    },
+    {
+      "name": "ultrainteract",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 1859
+    },
+    {
+      "name": "sigerlm_combined_instruction",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 60934
+    },
+    {
+      "name": "lampung_augmented_train",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 32059
+    },
+    {
+      "name": "kaggle_text_completion",
+      "format": "text_completion",
+      "weight": 1,
+      "rows_after_weight": 22622
+    }
+  ],
+  "rows_before_quality": 240635,
+  "filtered_too_long": 62,
+  "filtered_laravel_php_malformed": 0,
+  "laravel_fences_repaired": 0,
+  "rows_after_quality": 240573,
+  "duplicates_removed": 53901,
+  "rows_after_dedupe": 186672
+}

@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import subprocess
 import sys
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -29,6 +32,7 @@ from training.trainer import Trainer
 
 @dataclass
 class PipelineConfig:
+    mode: str = "auto"
     dense_loss_threshold: float = 3.5
     dense_min_steps: int = 1500
     dense_max_steps: int = 3000
@@ -39,12 +43,24 @@ class PipelineConfig:
     moe_checkpoint_dir: str = "./checkpoints/auto/moe"
     state_path: str = "./checkpoints/auto/pipeline_state.json"
     lora_config: str = "./configs/training/general_lora.json"
+    lora_curriculum_config: str = "./configs/training/lora_curriculum.json"
+    lora_curriculum_state_path: str = "./checkpoints/lora/curriculum_state.json"
+    lora_curriculum_log_dir: str = "./logs/lora_curriculum"
+    no_rebuild_corpora: bool = False
+    force_curriculum: bool = False
+    dry_run: bool = False
     force_stage: str | None = None
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Automatic SigerLM training pipeline: dense -> MoE -> LoRA."
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["auto", "lora-curriculum"],
+        default="auto",
+        help="auto runs the existing dense->MoE->LoRA pipeline; lora-curriculum runs LoRA stages easy-to-hard.",
     )
     parser.add_argument("--dense-loss-threshold", type=float, default=3.5)
     parser.add_argument("--dense-min-steps", type=int, default=1500)
@@ -56,6 +72,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--moe-checkpoint-dir", default="./checkpoints/auto/moe")
     parser.add_argument("--state-path", default="./checkpoints/auto/pipeline_state.json")
     parser.add_argument("--lora-config", default="./configs/training/general_lora.json")
+    parser.add_argument("--lora-curriculum-config", default="./configs/training/lora_curriculum.json")
+    parser.add_argument("--lora-curriculum-state-path", default="./checkpoints/lora/curriculum_state.json")
+    parser.add_argument("--lora-curriculum-log-dir", default="./logs/lora_curriculum")
+    parser.add_argument(
+        "--no-rebuild-corpora",
+        action="store_true",
+        help="Skip rebuilding curriculum corpora before each LoRA stage.",
+    )
+    parser.add_argument(
+        "--force-curriculum",
+        action="store_true",
+        help="Run every curriculum stage even when its merged output already exists.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print planned commands without running training.",
+    )
     parser.add_argument(
         "--force-stage",
         choices=["dense", "moe", "lora"],
@@ -90,6 +124,180 @@ def write_state(config: PipelineConfig, stage: str, status: str, **extra: Any) -
         **extra,
     }
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def write_lora_curriculum_state(config: PipelineConfig, payload: dict[str, Any]) -> None:
+    path = Path(config.lora_curriculum_state_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        **payload,
+    }
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def load_json(path: str | Path) -> dict[str, Any]:
+    with Path(path).open("r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def run_logged_command(
+    command: list[str],
+    *,
+    log_path: Path,
+    env: dict[str, str] | None = None,
+    dry_run: bool = False,
+) -> None:
+    printable = " ".join(command)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    print(f"\n$ {printable}")
+    print(f"log: {log_path}")
+
+    if dry_run:
+        return
+
+    merged_env = os.environ.copy()
+    if env:
+        merged_env.update(env)
+    merged_env.setdefault("PYTORCH_ALLOC_CONF", "expandable_segments:True")
+
+    with log_path.open("w", encoding="utf-8", errors="replace") as log_file:
+        log_file.write(f"$ {printable}\n\n")
+        log_file.flush()
+        process = subprocess.Popen(
+            command,
+            cwd=Path(__file__).resolve().parent,
+            env=merged_env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            bufsize=1,
+        )
+        assert process.stdout is not None
+        for line in process.stdout:
+            print(line, end="")
+            log_file.write(line)
+        return_code = process.wait()
+
+    if return_code != 0:
+        raise RuntimeError(f"Command failed with exit code {return_code}: {printable}")
+
+
+def lora_output_exists(training_config_path: str | Path) -> bool:
+    lora_config = LoRAConfig.from_json(training_config_path)
+    return Path(lora_config.merged_output).exists()
+
+
+def validate_lora_stage(stage: dict[str, Any]) -> None:
+    for key in ("name", "training_config"):
+        if not stage.get(key):
+            raise ValueError(f"LoRA curriculum stage missing {key}: {stage}")
+
+    training_config_path = Path(stage["training_config"])
+    if not training_config_path.exists():
+        raise FileNotFoundError(f"LoRA training config not found: {training_config_path}")
+
+    lora_config = LoRAConfig.from_json(training_config_path)
+    if not lora_config.dataset_path and not lora_config.dataset_name:
+        raise ValueError(f"LoRA stage has no dataset: {training_config_path}")
+
+    if lora_config.dataset_path and not Path(lora_config.dataset_path).exists():
+        registry_path = stage.get("dataset_registry")
+        if not registry_path:
+            raise FileNotFoundError(
+                f"Dataset not found for {stage['name']}: {lora_config.dataset_path}. "
+                "Add dataset_registry so the pipeline can build it."
+            )
+
+
+def run_lora_curriculum(config: PipelineConfig) -> None:
+    curriculum_path = Path(config.lora_curriculum_config)
+    curriculum = load_json(curriculum_path)
+    stages = list(curriculum.get("stages", []))
+    if not stages:
+        raise ValueError(f"LoRA curriculum has no stages: {curriculum_path}")
+
+    print(f"LoRA curriculum: {curriculum.get('name', curriculum_path.stem)}")
+    print(f"Stages: {len(stages)}")
+
+    for stage in stages:
+        validate_lora_stage(stage)
+
+    for index, stage in enumerate(stages, start=1):
+        name = str(stage["name"])
+        training_config_path = Path(stage["training_config"])
+        registry_path = stage.get("dataset_registry")
+        stage_prefix = f"{index:02d}_{name}"
+
+        write_lora_curriculum_state(
+            config,
+            {
+                "status": "running",
+                "stage": name,
+                "stage_index": index,
+                "training_config": str(training_config_path),
+            },
+        )
+
+        if registry_path and not config.no_rebuild_corpora:
+            run_logged_command(
+                [
+                    sys.executable,
+                    "tools/build_instruction_corpus.py",
+                    "--registry",
+                    str(registry_path),
+                ],
+                log_path=Path(config.lora_curriculum_log_dir) / f"{stage_prefix}_build.log",
+                dry_run=config.dry_run,
+            )
+
+        if lora_output_exists(training_config_path) and not config.force_curriculum:
+            lora_config = LoRAConfig.from_json(training_config_path)
+            print(f"Skip {name}: merged output already exists at {lora_config.merged_output}")
+            write_lora_curriculum_state(
+                config,
+                {
+                    "status": "skipped",
+                    "stage": name,
+                    "stage_index": index,
+                    "merged_output": lora_config.merged_output,
+                },
+            )
+            continue
+
+        run_logged_command(
+            [
+                sys.executable,
+                "lora/run_lora.py",
+                "--config",
+                str(training_config_path),
+            ],
+            log_path=Path(config.lora_curriculum_log_dir) / f"{stage_prefix}_lora.log",
+            dry_run=config.dry_run,
+        )
+
+        lora_config = LoRAConfig.from_json(training_config_path)
+        write_lora_curriculum_state(
+            config,
+            {
+                "status": "complete",
+                "stage": name,
+                "stage_index": index,
+                "merged_output": lora_config.merged_output,
+            },
+        )
+
+    write_lora_curriculum_state(
+        config,
+        {
+            "status": "complete",
+            "stage": "all",
+            "stages": [stage["name"] for stage in stages],
+        },
+    )
+    print("\nLoRA curriculum complete.")
 
 
 def build_base_train_config(
@@ -310,6 +518,10 @@ def run_lora_stage(config: PipelineConfig, base_checkpoint: Path) -> None:
 def main() -> None:
     args = parse_args()
     config = PipelineConfig(**vars(args))
+
+    if config.mode == "lora-curriculum":
+        run_lora_curriculum(config)
+        return
 
     maybe_relaunch_with_torchrun(
         script_path=Path(__file__).resolve(),

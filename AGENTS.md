@@ -36,8 +36,10 @@ Core LM harus tetap general:
 - `lora/` berisi instruction tuning.
 - `inference/` berisi generator, chat, router, dan pipeline domain.
 - `retrieval/` berisi lookup/lexicon/compositional translator untuk Lampung.
+- `modalities/` berisi kontrak adapter modality-agnostic untuk vision/audio/video/sensor/graph/dll.
 - `tools/` berisi builder/extractor dataset.
 - `configs/` berisi registry dataset dan config training.
+- `train_pipeline.py` berisi pipeline Dense -> MoE -> LoRA dan mode LoRA curriculum otomatis.
 
 Lampung-specific code tidak boleh ditaruh di core model. Taruh di `retrieval/`, `inference/lampung_pipeline.py`, dan `tools/build_lampung_dataset.py`.
 
@@ -52,8 +54,14 @@ training/dataset_registry.py           general dataset registry
 tools/build_instruction_corpus.py      unified corpus builder
 configs/datasets/general_instruction.json
 configs/datasets/lampung_instruction.json
+configs/datasets/curriculum_stage1_foundation.json
+configs/datasets/curriculum_stage2_general.json
+configs/datasets/curriculum_stage3_advanced.json
+configs/datasets/curriculum_stage4_full.json
 configs/training/general_lora.json
 configs/training/lampung_lora.json
+configs/training/lora_curriculum.json
+configs/training/curriculum_stage*_lora.json
 lora/run_lora.py                       config-driven LoRA runner
 lora/dataset.py                        instruction/chat formatting
 inference/router.py                    general vs domain router
@@ -61,12 +69,16 @@ inference/lampung_pipeline.py          Lampung lookup-first pipeline
 retrieval/instruction_lookup.py        exact and bag-of-words lookup
 retrieval/compositional_translator.py  rule composer ID/LO/EN
 chat_cli.py                            local CLI smoke tests
+modalities/base.py                     kontrak adapter modality -> sequence embedding
+modalities/registry.py                 daftar capability modality dan objective
+docs/MODALITY_AGNOSTIC_BACKBONE.md     roadmap Siger sebagai backbone modality-agnostic
 ```
 
 ## Coding Rules
 
 - Prefer incremental changes. Do not rewrite the whole project unless asked.
 - Keep the model architecture independent from Lampung-specific logic.
+- Keep the SSM backbone independent from any specific modality; non-text inputs should enter as projected `inputs_embeds`.
 - Use type hints for public functions.
 - Use `rg` for search.
 - Use `apply_patch` for manual edits.
@@ -94,12 +106,14 @@ Dataset registry sources currently support:
 - `instruction_jsonl`
 - `chat_jsonl`
 - `text_completion`
+- `mined_parallel_jsonl`
 
 Build corpora:
 
 ```powershell
 python tools\build_instruction_corpus.py --registry configs\datasets\lampung_instruction.json
 python tools\build_instruction_corpus.py --registry configs\datasets\general_instruction.json
+python tools\build_instruction_corpus.py --registry configs\datasets\curriculum_stage4_full.json
 ```
 
 ## Training Commands
@@ -118,6 +132,14 @@ python tools\build_instruction_corpus.py --registry configs\datasets\general_ins
 python lora\run_lora.py --config configs\training\general_lora.json
 ```
 
+Automatic easy-to-hard LoRA curriculum:
+
+```powershell
+python train_pipeline.py --mode lora-curriculum
+```
+
+Use `--dry-run` to preview commands, `--no-rebuild-corpora` to reuse existing corpora, and `--force-curriculum` to rerun stages whose merged outputs already exist.
+
 Default `python lora\run_lora.py` remains a Lampung-safe default for backward compatibility.
 
 ## Current Verified Results
@@ -132,6 +154,11 @@ train rows with English field: 1605
 train_augmented_instruction: 32059 rows
 general_instruction_train: 30704 rows
 lampung_instruction_train: 30701 rows
+kaggle_local_inputs_train: 51969 rows
+curriculum_stage1_foundation_train: 84605 rows
+curriculum_stage2_general_train: 186672 rows
+curriculum_stage3_advanced_train: 218596 rows
+curriculum_stage4_full_train: 218596 rows
 ```
 
 CLI mode `0` auto-routes:
@@ -159,7 +186,8 @@ Run relevant compile checks after edits:
 
 ```powershell
 python -m py_compile chat_cli.py inference\router.py inference\lampung_pipeline.py retrieval\instruction_lookup.py retrieval\compositional_translator.py
-python -m py_compile training\dataset_registry.py tools\build_instruction_corpus.py lora\config.py lora\dataset.py lora\run_lora.py
+python -m py_compile training\dataset_registry.py tools\build_instruction_corpus.py lora\config.py lora\dataset.py lora\run_lora.py train_pipeline.py
+python train_pipeline.py --mode lora-curriculum --dry-run
 ```
 
 CLI smoke:

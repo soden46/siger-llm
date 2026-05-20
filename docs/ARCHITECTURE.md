@@ -137,6 +137,16 @@ model/
 
 Tidak ada lookup, translation rules, lexicon, atau logic Lampung yang boleh masuk ke `model/`.
 
+Core model juga harus tetap modality-neutral. Text LM tetap menjadi path pertama, tetapi backbone SSM sekarang boleh menerima `inputs_embeds` dari adapter modality lain melalui `SigerLM.forward_hidden(...)`. Vision, audio, video, sensor, graph, table, OCR, music, biological sequence, financial event, retrieval, agent, dan robotics logic harus masuk lewat adapter/head di luar core SSM.
+
+Roadmap modality-agnostic dicatat di:
+
+```txt
+docs/MODALITY_AGNOSTIC_BACKBONE.md
+modalities/base.py
+modalities/registry.py
+```
+
 Lampung-specific behavior berada di:
 
 ```txt

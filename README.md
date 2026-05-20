@@ -52,6 +52,7 @@ Kalau kamu tertarik dengan low-resource language AI, infrastruktur AI Indonesia,
 - Custom LoRA fine-tuning untuk instruction tuning
 - Config-driven LoRA runner untuk general dan Lampung adapters
 - Adaptive training pipeline: Dense SSM -> hardware/metric-aware MoE -> LoRA
+- Automatic LoRA curriculum runner: foundation -> general -> advanced -> final polish from one command
 - Adaptive Sparse MoE sizing: jumlah expert, `top_k`, dan frekuensi layer MoE dipilih dari budget hardware dan loss checkpoint
 - Anti-collapse MoE routing: load-balance loss, router importance penalty, jitter eksplorasi, dan metrik `moe_dead`
 - Unified instruction corpus builder berbasis dataset registry
@@ -84,6 +85,7 @@ Repository saat ini sudah berisi model core, pipeline data, workflow training, L
 | [DISTRIBUTED_TRAINING_ROADMAP.md](DISTRIBUTED_TRAINING_ROADMAP.md) | Future multi-GPU, cluster, and distributed training scaling roadmap |
 | [docs/TRAINING.md](docs/TRAINING.md) | Base training, corpus builder, dan LoRA training flow |
 | [docs/LORA.md](docs/LORA.md) | LoRA config, dataset formatting, dan merge workflow |
+| [docs/MODALITY_AGNOSTIC_BACKBONE.md](docs/MODALITY_AGNOSTIC_BACKBONE.md) | Roadmap backbone modality-agnostic untuk text, vision, audio, video, sensor, graph, dan agent |
 | [docs/INFERENCE.md](docs/INFERENCE.md) | Generator, chat, Lampung pipeline, dan router CLI |
 | [docs/EVALUATION.md](docs/EVALUATION.md) | Current evaluation scope dan smoke results |
 | [docs/OPTIMIZATION.md](docs/OPTIMIZATION.md) | CPU/VPS, ONNX, quantization, dan benchmark notes |
@@ -105,7 +107,7 @@ raw data / domain data
   -> tools/build_* or dataset registry
   -> unified instruction corpus
   -> tokenizer/hybrid_tokenizer.py
-  -> base training / adaptive Dense -> MoE -> LoRA pipeline
+  -> base training / adaptive Dense -> MoE -> LoRA pipeline or LoRA curriculum
   -> merged checkpoint
   -> inference router
   -> general chat or Lampung domain tools
@@ -281,6 +283,7 @@ Build unified instruction corpora:
 ```powershell
 python tools\build_instruction_corpus.py --registry configs\datasets\lampung_instruction.json
 python tools\build_instruction_corpus.py --registry configs\datasets\general_instruction.json
+python tools\build_instruction_corpus.py --registry configs\datasets\curriculum_stage4_full.json
 ```
 
 Mine Q&A Indonesia, general instruction, dan Laravel docs/tutorial:
@@ -295,6 +298,7 @@ Dataset registry source formats:
 - `instruction_jsonl`
 - `chat_jsonl`
 - `text_completion`
+- `mined_parallel_jsonl`
 
 ## Dataset Examples
 
@@ -326,6 +330,12 @@ Train rows with English field: 1605
 Train augmented instruction: 32059 rows
 General instruction corpus: 30704 rows
 Lampung instruction corpus: 30701 rows
+Kaggle local instruction rows: 29358 rows
+Kaggle local corpus: 51969 rows
+Curriculum stage1 foundation: 84605 rows
+Curriculum stage2 general: 186672 rows
+Curriculum stage3 advanced: 218596 rows
+Curriculum stage4 full: 218596 rows
 ```
 
 `general_instruction_train.jsonl` belum menjadi corpus general-chat yang kuat. Saat ini isinya masih banyak dipengaruhi data Lampung plus file lokal Indonesian/English/code kecil. Tambahkan sumber yang lebih besar ke `configs/datasets/general_instruction.json` sebelum mengharapkan behavior chatbot umum yang matang.
@@ -339,6 +349,22 @@ python train_pipeline.py --lora-config configs\training\general_lora.json
 ```
 
 The pipeline starts from the dense SSM baseline, expands to Sparse MoE only after the dense checkpoint passes the configured loss/step gate, then trains LoRA after the MoE curve plateaus. During the MoE expansion stage, SigerLM chooses a conservative expert layout from the current hardware and the latest dense loss, so small CPU/VPS runs get fewer active experts while stronger CUDA runs can use more capacity.
+
+Automatic easy-to-hard LoRA curriculum:
+
+```powershell
+python train_pipeline.py --mode lora-curriculum
+```
+
+This command reads `configs/training/lora_curriculum.json`, rebuilds each stage corpus, trains LoRA stage 1 through stage 4, skips stages with existing merged outputs, and writes logs to `logs/lora_curriculum/`.
+
+Useful curriculum flags:
+
+```powershell
+python train_pipeline.py --mode lora-curriculum --dry-run
+python train_pipeline.py --mode lora-curriculum --no-rebuild-corpora
+python train_pipeline.py --mode lora-curriculum --force-curriculum
+```
 
 Lampung-only LoRA:
 
@@ -556,6 +582,7 @@ DISTRIBUTED_TRAINING_ROADMAP.md
 ### Training and Model Development
 
 - Use `train_pipeline.py` for reproducible Dense -> adaptive MoE -> LoRA experiments
+- Use `train_pipeline.py --mode lora-curriculum` for one-command easy-to-hard LoRA runs
 - Train and evaluate `general_lora.json`
 - Improve base training recipes
 - Train base model more seriously on larger corpus

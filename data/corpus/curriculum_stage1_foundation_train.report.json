@@ -1,0 +1,57 @@
+{
+  "registry": "curriculum_stage1_foundation",
+  "output_path": "data/corpus/curriculum_stage1_foundation_train.jsonl",
+  "max_row_tokens": 2048,
+  "strict_laravel_php": true,
+  "sources": [
+    {
+      "name": "indonesian_basic_text",
+      "format": "text_completion",
+      "weight": 1,
+      "rows_after_weight": 1
+    },
+    {
+      "name": "english_basic_text",
+      "format": "text_completion",
+      "weight": 1,
+      "rows_after_weight": 1
+    },
+    {
+      "name": "kaggle_normalization_conversation_hoax",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 29358
+    },
+    {
+      "name": "cendol_instruct",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 7867
+    },
+    {
+      "name": "corpus_indonesia_instruction",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 38682
+    },
+    {
+      "name": "lampung_basic_train",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 11860
+    },
+    {
+      "name": "lampung_kamus_full",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 260
+    }
+  ],
+  "rows_before_quality": 88029,
+  "filtered_too_long": 4,
+  "filtered_laravel_php_malformed": 0,
+  "laravel_fences_repaired": 0,
+  "rows_after_quality": 88025,
+  "duplicates_removed": 3420,
+  "rows_after_dedupe": 84605
+}

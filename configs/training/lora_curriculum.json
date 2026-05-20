@@ -1,0 +1,26 @@
+{
+  "name": "sigerlm_easy_to_hard_lora",
+  "description": "Automatic LoRA curriculum from foundation data to general instruction, reasoning, code, and final polish.",
+  "stages": [
+    {
+      "name": "stage1_foundation",
+      "dataset_registry": "configs/datasets/curriculum_stage1_foundation.json",
+      "training_config": "configs/training/curriculum_stage1_foundation_lora.json"
+    },
+    {
+      "name": "stage2_general",
+      "dataset_registry": "configs/datasets/curriculum_stage2_general.json",
+      "training_config": "configs/training/curriculum_stage2_general_lora.json"
+    },
+    {
+      "name": "stage3_advanced",
+      "dataset_registry": "configs/datasets/curriculum_stage3_advanced.json",
+      "training_config": "configs/training/curriculum_stage3_advanced_lora.json"
+    },
+    {
+      "name": "stage4_full",
+      "dataset_registry": "configs/datasets/curriculum_stage4_full.json",
+      "training_config": "configs/training/curriculum_stage4_full_lora.json"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "name": "kaggle_local_inputs",
+  "output_path": "data/corpus/kaggle_local_inputs_train.jsonl",
+  "shuffle_seed": 42,
+  "sources": [
+    {
+      "name": "kaggle_local_instruction",
+      "path": "data/kaggle/kaggle_extra_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI umum yang cerdas, akurat, dan ringkas. Jawab dalam Bahasa Indonesia kecuali user meminta bahasa lain.",
+      "metadata": {
+        "type": "kaggle_local_instruction"
+      }
+    },
+    {
+      "name": "kaggle_local_text",
+      "path": "data/kaggle/kaggle_extra_text.txt",
+      "format": "text_completion",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI umum yang cerdas, akurat, dan ringkas. Jawab dalam Bahasa Indonesia kecuali user meminta bahasa lain.",
+      "metadata": {
+        "type": "kaggle_local_text_completion"
+      }
+    }
+  ]
+}

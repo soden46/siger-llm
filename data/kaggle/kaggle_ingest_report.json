@@ -1,0 +1,12 @@
+{
+  "input_dir": "data\\kaggle\\raw",
+  "files": 13,
+  "text_blocks": 34846,
+  "instruction_rows": 29358,
+  "skipped_short_text": 18165,
+  "by_suffix": {
+    ".csv": 7,
+    ".txt": 2,
+    ".json": 4
+  }
+}

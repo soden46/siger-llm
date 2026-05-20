@@ -1,0 +1,21 @@
+{
+  "registry": "curriculum_stage4_full",
+  "output_path": "data/corpus/curriculum_stage4_full_train.jsonl",
+  "max_row_tokens": 2048,
+  "strict_laravel_php": true,
+  "sources": [
+    {
+      "name": "stage3_advanced",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 218596
+    }
+  ],
+  "rows_before_quality": 218596,
+  "filtered_too_long": 0,
+  "filtered_laravel_php_malformed": 0,
+  "laravel_fences_repaired": 0,
+  "rows_after_quality": 218596,
+  "duplicates_removed": 0,
+  "rows_after_dedupe": 218596
+}

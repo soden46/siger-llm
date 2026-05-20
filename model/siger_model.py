@@ -46,10 +46,10 @@ class SigerLM(nn.Module):
         self._init_selective_dt()
         self._scale_residual_projections()
 
-        # Weight tying:
-        # embedding weight dan output projection weight dibagi
-        # supaya parameter lebih hemat dan representasi lebih konsisten.
-        self.lm_head.weight = self.embedding.weight
+        # Weight tying remains the default for text LM checkpoints. Future
+        # multimodal heads can disable it and attach their own decoder head.
+        if getattr(config, "tie_word_embeddings", True):
+            self.lm_head.weight = self.embedding.weight
         self.last_moe_aux_loss = None
         self.last_moe_dead_expert_fraction = None
 
@@ -85,19 +85,22 @@ class SigerLM(nn.Module):
             if callable(reset):
                 reset()
 
-    def forward(self, input_ids, targets=None):
+    def forward_hidden(self, input_ids=None, inputs_embeds=None):
         """
         Args:
-            input_ids: Tensor shape (B, L)
-            targets:   Tensor shape (B, L), optional
+            input_ids: Tensor shape (B, L), optional token IDs.
+            inputs_embeds: Tensor shape (B, L, d_model), optional projected
+                embeddings from a non-text modality adapter.
 
         Returns:
-            logits: Tensor shape (B, L, vocab_size)
-            loss:   Cross entropy loss jika targets diberikan, else None
+            hidden states: Tensor shape (B, L, d_model)
         """
 
-        # (B, L) → (B, L, d_model)
-        x = self.embedding(input_ids)
+        if (input_ids is None) == (inputs_embeds is None):
+            raise ValueError("Exactly one of input_ids or inputs_embeds must be provided.")
+
+        # Text path uses token IDs; non-text adapters provide embeddings.
+        x = self.embedding(input_ids) if inputs_embeds is None else inputs_embeds
 
         # Lewat semua SSM blocks
         for layer in self.layers:
@@ -107,10 +110,25 @@ class SigerLM(nn.Module):
                 x = layer(x)
 
         # Final normalization
-        x = self.norm_f(x)
+        return self.norm_f(x)
 
-        # (B, L, d_model) → (B, L, vocab_size)
-        logits = self.lm_head(x)
+    def project_logits(self, hidden_states):
+        return self.lm_head(hidden_states)
+
+    def forward(self, input_ids=None, targets=None, inputs_embeds=None):
+        """
+        Args:
+            input_ids: Tensor shape (B, L), optional token IDs.
+            targets: Tensor shape (B, L), optional labels.
+            inputs_embeds: Tensor shape (B, L, d_model), optional projected
+                sequence from any modality adapter.
+
+        Returns:
+            logits: Tensor shape (B, L, vocab_size)
+            loss: Cross entropy loss jika targets diberikan, else None
+        """
+        x = self.forward_hidden(input_ids=input_ids, inputs_embeds=inputs_embeds)
+        logits = self.project_logits(x)
 
         loss = None
         if targets is not None:

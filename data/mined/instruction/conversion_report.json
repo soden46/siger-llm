@@ -1,0 +1,45 @@
+{
+    "generated_at": "2026-05-20 00:25:52",
+    "total_raw_rows": 74411,
+    "total_deduped": 66051,
+    "duplicates_removed": 8360,
+    "files_processed": 8,
+    "by_type": {
+        "instruction": 11952,
+        "translation": 39489,
+        "lampung_text": 14610
+    },
+    "by_source": {
+        "cendol_instruct": 1000,
+        "cendol_instruct_translation": 2976,
+        "cendol_instruct_lampung_augment": 1002,
+        "code_contests_translation": 3002,
+        "code_contests_lampung_augment": 1017,
+        "corpus_indonesia": 9453,
+        "corpus_indonesia_translation": 24164,
+        "corpus_indonesia_lampung_augment": 9445,
+        "gsm8k": 1000,
+        "gsm8k_translation": 6000,
+        "gsm8k_lampung_augment": 2000,
+        "kamus_lampung_o_full_translation": 178,
+        "kamus_lampung_o_full_lampung_augment": 88,
+        "slim_orca": 499,
+        "slim_orca_translation": 3015,
+        "slim_orca_lampung_augment": 1006,
+        "ultrainteract_translation": 154,
+        "ultrainteract_lampung_augment": 52
+    },
+    "output_files": {
+        "combined": "/kaggle/working/sigerlm_ready/sigerlm_combined_instruction.jsonl",
+        "per_dataset": [
+            "/kaggle/working/sigerlm_ready/cendol_instruct_sigerlm.jsonl",
+            "/kaggle/working/sigerlm_ready/code_contests_sigerlm.jsonl",
+            "/kaggle/working/sigerlm_ready/corpus_indonesia_sigerlm.jsonl",
+            "/kaggle/working/sigerlm_ready/gsm8k_sigerlm.jsonl",
+            "/kaggle/working/sigerlm_ready/kamus_lampung_o_full_sigerlm.jsonl",
+            "/kaggle/working/sigerlm_ready/slim_orca_sigerlm.jsonl",
+            "/kaggle/working/sigerlm_ready/ultrainteract_sigerlm.jsonl"
+        ]
+    },
+    "next_step": "Copy sigerlm_combined_instruction.jsonl ke data/corpus/ di repo SigerLM, lalu jalankan: python tools/build_instruction_corpus.py --registry configs/datasets/kaggle_mined.json"
+}

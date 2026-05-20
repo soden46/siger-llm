@@ -4,6 +4,7 @@ SigerLM has two training paths:
 
 1. Base LM training with next-token prediction.
 2. LoRA instruction tuning with config-driven datasets.
+3. Automatic easy-to-hard LoRA curriculum through `train_pipeline.py --mode lora-curriculum`.
 
 The current generalization work is mostly in the second path: unified instruction corpora and configurable LoRA runs.
 
@@ -96,6 +97,59 @@ python train_pipeline.py --moe-plateau-delta 0.01 --lora-config configs\training
 python train_pipeline.py --force-stage lora --lora-config configs\training\general_lora.json
 ```
 
+## Automatic LoRA Curriculum
+
+For one-command instruction tuning from easier data to harder data:
+
+```powershell
+python train_pipeline.py --mode lora-curriculum
+```
+
+On Kaggle/CUDA, the same command can be launched with the allocator hint:
+
+```bash
+PYTORCH_ALLOC_CONF=expandable_segments:True python train_pipeline.py --mode lora-curriculum
+```
+
+The curriculum definition lives in:
+
+```txt
+configs/training/lora_curriculum.json
+```
+
+Current stage order:
+
+```txt
+stage1_foundation -> stage2_general -> stage3_advanced -> stage4_full
+```
+
+Each stage can rebuild its corpus from `configs/datasets/curriculum_stage*.json`, run the matching LoRA config, merge the adapter into a normal checkpoint, then use that merged checkpoint as the base for the next stage.
+
+Generated outputs:
+
+```txt
+data/corpus/curriculum_stage1_foundation_train.jsonl
+data/corpus/curriculum_stage2_general_train.jsonl
+data/corpus/curriculum_stage3_advanced_train.jsonl
+data/corpus/curriculum_stage4_full_train.jsonl
+checkpoints/lora/model_curriculum_stage1_foundation_merged.pt
+checkpoints/lora/model_curriculum_stage2_general_merged.pt
+checkpoints/lora/model_curriculum_stage3_advanced_merged.pt
+checkpoints/lora/model_curriculum_stage4_full_merged.pt
+logs/lora_curriculum/*.log
+checkpoints/lora/curriculum_state.json
+```
+
+Useful flags:
+
+```powershell
+python train_pipeline.py --mode lora-curriculum --dry-run
+python train_pipeline.py --mode lora-curriculum --no-rebuild-corpora
+python train_pipeline.py --mode lora-curriculum --force-curriculum
+```
+
+The runner skips a stage when its `merged_output` already exists unless `--force-curriculum` is set.
+
 For manual MoE experiments through `main.py`, adaptive sizing is enabled for `SIGER_MODEL_PROFILE=small_moe` by default. Disable it only when exact static expert counts are required:
 
 ```powershell
@@ -131,6 +185,7 @@ Supported source formats:
 - `instruction_jsonl`
 - `chat_jsonl`
 - `text_completion`
+- `mined_parallel_jsonl`
 
 Instruction JSONL:
 
@@ -164,6 +219,8 @@ python tools\build_instruction_corpus.py --registry configs\datasets\indonesian_
 ```
 
 Use `--max-row-tokens 512` for the first 11.8M-parameter LoRA run. Increase to `768` or `1024` only after label inspection and short training look healthy.
+
+For current curriculum runs, `max_seq_len=1024` is used from stage 2 onward because Kaggle/news rows truncate heavily at 512.
 
 ## LoRA Training
 
@@ -199,6 +256,12 @@ python tools\inspect_lora_dataset.py data\corpus\indonesian_hf_mix_plus_kaggle_r
 python lora\run_lora.py --config configs\training\indonesian_hf_mix_plus_kaggle_reasoning_lora.json
 ```
 
+Curriculum LoRA:
+
+```powershell
+python train_pipeline.py --mode lora-curriculum
+```
+
 Default:
 
 ```powershell
@@ -223,6 +286,12 @@ configs/training/general_lora.json
   max_steps: 5000
   max_seq_len: 384
   merged_output: checkpoints/lora/model_general_merged.pt
+
+configs/training/curriculum_stage4_full_lora.json
+  dataset_path: data/corpus/curriculum_stage4_full_train.jsonl
+  max_steps: 2000
+  max_seq_len: 1024
+  merged_output: checkpoints/lora/model_curriculum_stage4_full_merged.pt
 ```
 
 ## Latest Verified Data Counts
@@ -230,6 +299,11 @@ configs/training/general_lora.json
 ```txt
 data/corpus/lampung_instruction_train.jsonl: 30701 rows
 data/corpus/general_instruction_train.jsonl: 30704 rows
+data/corpus/kaggle_local_inputs_train.jsonl: 51969 rows
+data/corpus/curriculum_stage1_foundation_train.jsonl: 84605 rows
+data/corpus/curriculum_stage2_general_train.jsonl: 186672 rows
+data/corpus/curriculum_stage3_advanced_train.jsonl: 218596 rows
+data/corpus/curriculum_stage4_full_train.jsonl: 218596 rows
 ```
 
 The general corpus is currently mostly Lampung plus tiny local text sources. For real general chatbot ability, add larger instruction/chat corpora to `configs/datasets/general_instruction.json`.
@@ -259,5 +333,7 @@ For 2 core / 4GB RAM:
 
 ```powershell
 python -m py_compile training\dataset_registry.py tools\build_instruction_corpus.py lora\config.py lora\dataset.py lora\run_lora.py
+python -m py_compile train_pipeline.py
 python lora\run_lora.py --help
+python train_pipeline.py --mode lora-curriculum --dry-run
 ```

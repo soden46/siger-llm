@@ -84,7 +84,60 @@ def first_value(row: dict[str, Any], keys: list[str]) -> Any:
     return None
 
 
+def has_template_placeholder(*values: Any) -> bool:
+    return any("{{" in str(value or "") or "}}" in str(value or "") for value in values)
+
+
+def label_to_hoax_text(value: Any) -> str | None:
+    text = normalize_text(value).lower()
+    if text in {"1", "true", "hoax", "hoaks", "fake", "false news"}:
+        return "hoaks"
+    if text in {"0", "false", "valid", "real", "non-hoax", "non hoax", "bukan hoax", "bukan hoaks"}:
+        return "bukan hoaks"
+    return None
+
+
 def row_to_instruction(row: dict[str, Any], source: str) -> dict[str, Any] | None:
+    slang = normalize_text(first_value(row, ["slang", "tidak_baku", "nonformal", "informal"]))
+    formal = normalize_text(first_value(row, ["formal", "normal", "normalized", "baku"]))
+    if slang and formal and slang != formal and not has_template_placeholder(slang, formal):
+        return {
+            "instruction": "Normalisasikan kata tidak baku berikut ke Bahasa Indonesia baku.",
+            "input": slang,
+            "output": formal,
+            "system": DEFAULT_SYSTEM_PROMPT,
+            "source": source,
+            "type": "kaggle_normalization",
+        }
+
+    user_text = clean_text(first_value(row, ["you", "user", "pertama"]))
+    assistant_text = clean_text(first_value(row, ["eliana", "assistant", "bot", "kedua"]))
+    if user_text and assistant_text and not has_template_placeholder(user_text, assistant_text):
+        return {
+            "instruction": "Balas percakapan pengguna berikut secara natural dalam Bahasa Indonesia.",
+            "input": user_text,
+            "output": assistant_text,
+            "system": DEFAULT_SYSTEM_PROMPT,
+            "source": source,
+            "type": "kaggle_conversation",
+        }
+
+    if "hoaks" in source or "hoax" in source:
+        article = clean_text(first_value(row, ["clean_text", "narasi", "article", "berita", "text"]))
+        title = normalize_text(first_value(row, ["judul", "title"]))
+        label_value = first_value(row, ["hoax", "hoaks", "label"])
+        label_text = label_to_hoax_text(label_value)
+        if article and label_text and not has_template_placeholder(title, article, label_text):
+            input_text = f"Judul: {title}\n\nIsi: {article}" if title else article
+            return {
+                "instruction": "Klasifikasikan apakah berita berikut hoaks atau bukan hoaks.",
+                "input": input_text,
+                "output": label_text,
+                "system": DEFAULT_SYSTEM_PROMPT,
+                "source": source,
+                "type": "kaggle_hoax_classification",
+            }
+
     instruction = normalize_text(first_value(row, INSTRUCTION_KEYS))
     output = clean_text(first_value(row, OUTPUT_KEYS))
     input_text = clean_text(first_value(row, INPUT_KEYS))
@@ -94,6 +147,9 @@ def row_to_instruction(row: dict[str, Any], source: str) -> dict[str, Any] | Non
 
     if input_text == instruction:
         input_text = ""
+
+    if has_template_placeholder(instruction, input_text, output):
+        return None
 
     return {
         "instruction": instruction,

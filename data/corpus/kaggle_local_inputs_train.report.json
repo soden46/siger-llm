@@ -1,0 +1,27 @@
+{
+  "registry": "kaggle_local_inputs",
+  "output_path": "data/corpus/kaggle_local_inputs_train.jsonl",
+  "max_row_tokens": 2048,
+  "strict_laravel_php": true,
+  "sources": [
+    {
+      "name": "kaggle_local_instruction",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 29358
+    },
+    {
+      "name": "kaggle_local_text",
+      "format": "text_completion",
+      "weight": 1,
+      "rows_after_weight": 22622
+    }
+  ],
+  "rows_before_quality": 51980,
+  "filtered_too_long": 3,
+  "filtered_laravel_php_malformed": 0,
+  "laravel_fences_repaired": 0,
+  "rows_after_quality": 51977,
+  "duplicates_removed": 8,
+  "rows_after_dedupe": 51969
+}

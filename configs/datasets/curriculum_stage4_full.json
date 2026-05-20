@@ -1,0 +1,15 @@
+{
+  "name": "curriculum_stage4_full",
+  "output_path": "data/corpus/curriculum_stage4_full_train.jsonl",
+  "shuffle_seed": 47,
+  "sources": [
+    {
+      "name": "stage3_advanced",
+      "path": "data/corpus/curriculum_stage3_advanced_train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI umum yang cerdas, ringkas, dan akurat.",
+      "metadata": {"type": "curriculum_stage3"}
+    }
+  ]
+}

@@ -222,11 +222,63 @@ def convert_mined_parallel_jsonl(source: DatasetSource) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
 
     for raw in iter_jsonl(source.path):
-        text_id = normalize_text(raw.get("text_id"))
-        text_lam_o = normalize_text(raw.get("text_lam_o"))
-        text_en = normalize_text(raw.get("text_en"))
+        text_id = normalize_text(raw.get("text_id") or raw.get("indonesian"))
+        text_lam_o = normalize_text(raw.get("text_lam_o") or raw.get("lampung_o") or raw.get("lampung"))
+        text_en = normalize_text(raw.get("text_en") or raw.get("english"))
+        question_id = normalize_text(raw.get("question_id"))
+        question_lam_o = normalize_text(raw.get("question_lam_o"))
+        question_en = normalize_text(raw.get("question_en"))
+        answer_id = normalize_text(raw.get("answer_id"))
+        answer_lam_o = normalize_text(raw.get("answer_lam_o"))
+        answer_en = normalize_text(raw.get("answer_en"))
         category = normalize_text(raw.get("_category"))
         system_prompt = source.system_prompt or DEFAULT_SYSTEM_PROMPT
+
+        if question_id and answer_id:
+            rows.append(
+                instruction_row(
+                    instruction=question_id,
+                    output=answer_id,
+                    system_prompt=system_prompt,
+                    source=source.name,
+                    task_type=source.metadata.get("type", "qa_id"),
+                )
+            )
+
+        if question_lam_o and answer_id:
+            rows.append(
+                instruction_row(
+                    instruction="Jawab pertanyaan Lampung Dialek O berikut dalam Bahasa Indonesia.",
+                    input_text=question_lam_o,
+                    output=answer_id,
+                    system_prompt=system_prompt,
+                    source=source.name,
+                    task_type=source.metadata.get("type", "lampung_o_qa_to_id"),
+                )
+            )
+
+        if question_en and answer_en:
+            rows.append(
+                instruction_row(
+                    instruction=question_en,
+                    output=answer_en,
+                    system_prompt=system_prompt,
+                    source=source.name,
+                    task_type=source.metadata.get("type", "qa_en"),
+                )
+            )
+
+        if answer_lam_o and answer_id:
+            rows.append(
+                instruction_row(
+                    instruction="Terjemahkan teks Lampung Dialek O berikut ke Bahasa Indonesia.",
+                    input_text=answer_lam_o,
+                    output=answer_id,
+                    system_prompt=system_prompt,
+                    source=source.name,
+                    task_type=source.metadata.get("type", "lampung_o_to_id"),
+                )
+            )
 
         if text_lam_o and text_id:
             rows.append(
@@ -240,6 +292,18 @@ def convert_mined_parallel_jsonl(source: DatasetSource) -> list[dict[str, Any]]:
                 )
             )
             continue
+
+        if text_lam_o and text_en:
+            rows.append(
+                instruction_row(
+                    instruction="Translate the following Lampung Dialect O text into English.",
+                    input_text=text_lam_o,
+                    output=text_en,
+                    system_prompt=system_prompt,
+                    source=source.name,
+                    task_type=source.metadata.get("type", "lampung_o_to_en"),
+                )
+            )
 
         if text_id:
             rows.append(

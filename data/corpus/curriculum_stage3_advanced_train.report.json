@@ -1,0 +1,87 @@
+{
+  "registry": "curriculum_stage3_advanced",
+  "output_path": "data/corpus/curriculum_stage3_advanced_train.jsonl",
+  "max_row_tokens": 2048,
+  "strict_laravel_php": true,
+  "sources": [
+    {
+      "name": "stage2_general",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 186672
+    },
+    {
+      "name": "gsm8k_reasoning",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 8989
+    },
+    {
+      "name": "code_contests",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 4799
+    },
+    {
+      "name": "laravel_instruction",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 180
+    },
+    {
+      "name": "software_engineering_seed",
+      "format": "instruction_jsonl",
+      "weight": 2,
+      "rows_after_weight": 56
+    },
+    {
+      "name": "reasoning_cot_seed",
+      "format": "instruction_jsonl",
+      "weight": 3,
+      "rows_after_weight": 45
+    },
+    {
+      "name": "uncertainty_seed",
+      "format": "instruction_jsonl",
+      "weight": 2,
+      "rows_after_weight": 28
+    },
+    {
+      "name": "lampung_reasoning_train",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 11860
+    },
+    {
+      "name": "lampung_word_order_train",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 8339
+    },
+    {
+      "name": "lampung_trilingual_normalized",
+      "format": "mined_parallel_jsonl",
+      "weight": 1,
+      "rows_after_weight": 2
+    },
+    {
+      "name": "sigerlm_final_parallel",
+      "format": "mined_parallel_jsonl",
+      "weight": 1,
+      "rows_after_weight": 3992
+    },
+    {
+      "name": "sigerlm_text_parallel",
+      "format": "mined_parallel_jsonl",
+      "weight": 1,
+      "rows_after_weight": 8650
+    }
+  ],
+  "rows_before_quality": 233612,
+  "filtered_too_long": 16,
+  "filtered_laravel_php_malformed": 0,
+  "laravel_fences_repaired": 0,
+  "rows_after_quality": 233596,
+  "duplicates_removed": 15000,
+  "rows_after_dedupe": 218596
+}

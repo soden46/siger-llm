@@ -1,0 +1,103 @@
+{
+  "name": "curriculum_stage3_advanced",
+  "output_path": "data/corpus/curriculum_stage3_advanced_train.jsonl",
+  "shuffle_seed": 45,
+  "sources": [
+    {
+      "name": "stage2_general",
+      "path": "data/corpus/curriculum_stage2_general_train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI umum yang cerdas, ringkas, dan akurat.",
+      "metadata": {"type": "curriculum_stage2"}
+    },
+    {
+      "name": "gsm8k_reasoning",
+      "path": "data/mined/instruction/gsm8k_sigerlm.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten penalaran matematika yang menjawab runtut dan akurat.",
+      "metadata": {"type": "math_reasoning"}
+    },
+    {
+      "name": "code_contests",
+      "path": "data/mined/instruction/code_contests_sigerlm.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten pemrograman yang menyelesaikan masalah algoritmik secara benar.",
+      "metadata": {"type": "code_reasoning"}
+    },
+    {
+      "name": "laravel_instruction",
+      "path": "data/mined/instruction/laravel_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten pengembang Laravel yang praktis dan akurat.",
+      "metadata": {"type": "software_engineering_laravel"}
+    },
+    {
+      "name": "software_engineering_seed",
+      "path": "data/capabilities/software_engineering_seed.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 2,
+      "system_prompt": "Kamu adalah SigerLM, asisten rekayasa perangkat lunak yang membangun solusi production-ready.",
+      "metadata": {"type": "software_engineering_capability"}
+    },
+    {
+      "name": "reasoning_cot_seed",
+      "path": "data/capabilities/reasoning_cot_seed.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 3,
+      "system_prompt": "Kamu adalah SigerLM, asisten penalaran yang menjawab runtut saat analisis diperlukan.",
+      "metadata": {"type": "reasoning_cot"}
+    },
+    {
+      "name": "uncertainty_seed",
+      "path": "data/capabilities/uncertainty_seed.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 2,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI yang jujur tentang batas pengetahuan dan tidak mengarang.",
+      "metadata": {"type": "uncertainty_awareness"}
+    },
+    {
+      "name": "lampung_reasoning_train",
+      "path": "data/lampung/final/train_reasoning_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten Bahasa Lampung yang bernalar runtut dan akurat.",
+      "metadata": {"type": "lampung_reasoning"}
+    },
+    {
+      "name": "lampung_word_order_train",
+      "path": "data/lampung/final/train_word_order_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten Bahasa Lampung yang memahami urutan kata dan terjemahan.",
+      "metadata": {"type": "lampung_word_order"}
+    },
+    {
+      "name": "lampung_trilingual_normalized",
+      "path": "data/lampung/final/lampung_o_trilingual_normalized.jsonl",
+      "format": "mined_parallel_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten trilingual Bahasa Lampung Dialek O, Indonesia, dan Inggris.",
+      "metadata": {"type": "lampung_trilingual"}
+    },
+    {
+      "name": "sigerlm_final_parallel",
+      "path": "data/mined/instruction/sigerlm_final_dataset.jsonl",
+      "format": "mined_parallel_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI umum dengan kemampuan Bahasa Indonesia, Inggris, dan Lampung Dialek O.",
+      "metadata": {"type": "sigerlm_parallel_qa"}
+    },
+    {
+      "name": "sigerlm_text_parallel",
+      "path": "data/corpus/sigerlm_final_dataset.jsonl",
+      "format": "mined_parallel_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI umum dengan kemampuan Bahasa Indonesia, Inggris, dan Lampung Dialek O.",
+      "metadata": {"type": "sigerlm_parallel_text"}
+    }
+  ]
+}

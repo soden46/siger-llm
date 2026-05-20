@@ -46,6 +46,10 @@ class SigerConfig:
     # ── Training ──────────────────────────────────────────
     max_seq_len: int  = 2048
     pad_token_id: int = 100258      # <|pad|>
+    model_kind: str = "causal_lm"
+    input_modality: str = "text"
+    output_modality: str = "text"
+    tie_word_embeddings: bool = True
 
     # ── Initialization ────────────────────────────────────
     initializer_range: float = 0.02
@@ -83,6 +87,11 @@ class SigerConfig:
             raise ValueError("moe_layers_every must be >= 1")
         if self.moe_router_jitter < 0:
             raise ValueError("moe_router_jitter must be >= 0")
+        self.model_kind = self.model_kind.lower()
+        if self.model_kind not in {"causal_lm", "backbone", "encoder", "seq2seq", "multimodal"}:
+            raise ValueError(f"Unsupported model_kind: {self.model_kind}")
+        self.input_modality = self.input_modality.lower()
+        self.output_modality = self.output_modality.lower()
         self.model_base_name = SIGER_BASE_NAME
         self.model_alias = canonical_model_name(self.model_alias)
 
