@@ -191,6 +191,52 @@ def lora_output_exists(training_config_path: str | Path) -> bool:
     return Path(lora_config.merged_output).exists()
 
 
+def resolve_lora_base_checkpoint_path(checkpoint_path: str | Path) -> Path | None:
+    path = Path(checkpoint_path)
+    if path.exists():
+        return path
+
+    latest_meta = path.parent / "latest.json"
+    if path.name == "best_model.pt" and latest_meta.exists():
+        try:
+            latest = load_json(latest_meta)
+        except Exception:
+            return None
+        fallback = path.parent / str(latest.get("latest", ""))
+        if fallback.exists():
+            return fallback
+
+    return None
+
+
+def require_lora_base_checkpoint(
+    stage_name: str,
+    training_config_path: str | Path,
+    *,
+    dry_run: bool = False,
+) -> None:
+    lora_config = LoRAConfig.from_json(training_config_path)
+    resolved = resolve_lora_base_checkpoint_path(lora_config.base_checkpoint)
+    if resolved is not None:
+        return
+
+    if dry_run:
+        print(
+            f"Dry run: base checkpoint for LoRA stage '{stage_name}' is not present yet: "
+            f"{lora_config.base_checkpoint}"
+        )
+        return
+
+    raise FileNotFoundError(
+        f"Base checkpoint for LoRA stage '{stage_name}' not found: {lora_config.base_checkpoint}\n"
+        "LoRA needs a pretrained/base SigerLM checkpoint before adapter training can start.\n"
+        "On Kaggle, attach or upload the checkpoint dataset, then copy it into the path expected by the config, for example:\n"
+        "  mkdir -p checkpoints\n"
+        "  cp /kaggle/input/<checkpoint-dataset>/best_model.pt checkpoints/best_model.pt\n"
+        "Or edit the stage LoRA config base_checkpoint to point at the attached checkpoint path."
+    )
+
+
 def validate_lora_stage(stage: dict[str, Any]) -> None:
     for key in ("name", "training_config"):
         if not stage.get(key):
@@ -232,6 +278,22 @@ def run_lora_curriculum(config: PipelineConfig) -> None:
         registry_path = stage.get("dataset_registry")
         stage_prefix = f"{index:02d}_{name}"
 
+        if lora_output_exists(training_config_path) and not config.force_curriculum:
+            lora_config = LoRAConfig.from_json(training_config_path)
+            print(f"Skip {name}: merged output already exists at {lora_config.merged_output}")
+            write_lora_curriculum_state(
+                config,
+                {
+                    "status": "skipped",
+                    "stage": name,
+                    "stage_index": index,
+                    "merged_output": lora_config.merged_output,
+                },
+            )
+            continue
+
+        require_lora_base_checkpoint(name, training_config_path, dry_run=config.dry_run)
+
         write_lora_curriculum_state(
             config,
             {
@@ -253,20 +315,6 @@ def run_lora_curriculum(config: PipelineConfig) -> None:
                 log_path=Path(config.lora_curriculum_log_dir) / f"{stage_prefix}_build.log",
                 dry_run=config.dry_run,
             )
-
-        if lora_output_exists(training_config_path) and not config.force_curriculum:
-            lora_config = LoRAConfig.from_json(training_config_path)
-            print(f"Skip {name}: merged output already exists at {lora_config.merged_output}")
-            write_lora_curriculum_state(
-                config,
-                {
-                    "status": "skipped",
-                    "stage": name,
-                    "stage_index": index,
-                    "merged_output": lora_config.merged_output,
-                },
-            )
-            continue
 
         run_logged_command(
             [
