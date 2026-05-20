@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import html
 import json
 import re
 import sys
@@ -43,13 +44,30 @@ DEFAULT_SYSTEM_PROMPT = (
     "Jawab dalam Bahasa Indonesia kecuali user meminta bahasa lain."
 )
 
+WEB_HTML_RE = re.compile(
+    r"</?(?:p|br|div|span|ul|ol|li|a|strong|b|em|i|blockquote|h[1-6]|table|tr|td|th)\b[^>]*>|href\s*=",
+    flags=re.IGNORECASE,
+)
+HTML_TAG_RE = re.compile(r"<[^>\n]{1,500}>")
+HTML_HREF_ATTR_RE = re.compile(r"\s+href\s*=\s*([\"']).*?\1", flags=re.IGNORECASE)
+URL_RE = re.compile(r"\b(?:https?://|www\.)\S+", flags=re.IGNORECASE)
+CODE_CONTEXT_RE = re.compile(
+    r"```|<\?php|</?(?:html|head|body|script|style|template|form|input|button|select|option|textarea|svg|canvas)\b|"
+    r"\b(?:function|class|const|let|var|public|private|protected|import|export)\b",
+    flags=re.IGNORECASE,
+)
+
 
 def normalize_text(value: Any) -> str:
     return re.sub(r"\s+", " ", str(value or "").replace("\xa0", " ")).strip()
 
 
 def clean_text(value: Any) -> str:
-    text = str(value or "").replace("\xa0", " ")
+    text = html.unescape(str(value or "")).replace("\xa0", " ")
+    if WEB_HTML_RE.search(text) and not CODE_CONTEXT_RE.search(text):
+        text = HTML_HREF_ATTR_RE.sub("", text)
+        text = HTML_TAG_RE.sub(" ", text)
+        text = URL_RE.sub("", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
 

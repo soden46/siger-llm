@@ -111,6 +111,14 @@ On Kaggle/CUDA, the same command can be launched with the allocator hint:
 PYTORCH_ALLOC_CONF=expandable_segments:True python train_pipeline.py --mode lora-curriculum
 ```
 
+LoRA stages are hardware-aware. If CUDA is available, SigerLM uses CUDA mixed precision and conservative VRAM-aware batch scaling. If the runtime falls back to CPU, the run is automatically capped to a small smoke/debug profile (`cpu_max_steps`, `cpu_max_samples`, `cpu_max_seq_len`) so a Kaggle notebook does not spend days on accidental FP32 CPU training.
+
+For a deliberate full CPU run:
+
+```bash
+SIGER_ALLOW_CPU_FULL_TRAIN=1 PYTORCH_ALLOC_CONF=expandable_segments:True python train_pipeline.py --mode lora-curriculum
+```
+
 The curriculum definition lives in:
 
 ```txt

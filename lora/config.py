@@ -38,6 +38,15 @@ class LoRAConfig:
     sharded_checkpoint: bool = False
     elastic_recovery: bool = True
     resource_target_fraction: float = 0.8
+    auto_scale_for_hardware: bool = True
+    cpu_max_steps: int = 80
+    cpu_max_samples: Optional[int] = 2000
+    cpu_max_seq_len: int = 256
+    cpu_batch_size: int = 1
+    cpu_grad_accum: int = 8
+    cpu_save_every: int = 40
+    low_vram_max_seq_len: int = 512
+    low_vram_max_global_batch_size: int = 4
 
     # ── Dataset Lokal Lampung ─────────────────────────────
     dataset_path: str = "data/lampung/final/train_instruction.jsonl"

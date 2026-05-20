@@ -11,7 +11,43 @@ hardware = detect_hardware(prefer_gpu=True)
 print_hardware_profile(hardware)
 ```
 
-`lora/run_lora.py` uses this to choose GPU when available and reduce CPU thread usage on low-RAM machines.
+`lora/run_lora.py` uses this to choose GPU when available, reduce CPU thread usage on low-RAM machines, and scale LoRA runs to the detected hardware.
+
+## LoRA Hardware Policy
+
+LoRA configs support `auto_scale_for_hardware=true` by default. The policy is applied by `lora/run_lora.py` and by the LoRA stage inside `train_pipeline.py`.
+
+CUDA behavior:
+
+```txt
+>= 14GB VRAM  keep configured sequence length and let VRAM batch tuning work
+8-14GB VRAM   cap global batch conservatively
+< 8GB VRAM    cap max_seq_len to low_vram_max_seq_len and reduce batch pressure
+```
+
+CPU behavior:
+
+```txt
+device=cpu
+precision=fp32
+max_steps capped to cpu_max_steps
+max_samples capped to cpu_max_samples
+max_seq_len capped to cpu_max_seq_len
+batch_size capped to cpu_batch_size
+grad_accum raised to cpu_grad_accum
+```
+
+This prevents accidental full LoRA training on CPU-only Kaggle sessions. To intentionally run the original full CPU config, set:
+
+```bash
+SIGER_ALLOW_CPU_FULL_TRAIN=1 python lora/run_lora.py --config configs/training/general_lora.json
+```
+
+To disable the policy for one direct LoRA run:
+
+```bash
+python lora/run_lora.py --config configs/training/general_lora.json --no-hardware-policy
+```
 
 ## Runtime Hardware Planner
 

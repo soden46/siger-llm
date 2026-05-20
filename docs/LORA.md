@@ -44,6 +44,15 @@ Kaggle/CUDA example:
 PYTORCH_ALLOC_CONF=expandable_segments:True python train_pipeline.py --mode lora-curriculum
 ```
 
+`lora/run_lora.py` applies an automatic hardware policy before training. CUDA runs keep the requested config when VRAM allows it and use conservative caps on low-VRAM GPUs. CPU-only runs become bounded smoke/debug runs by default, so losing Kaggle GPU quota does not accidentally launch a multi-day FP32 training job.
+
+Override only when intentional:
+
+```bash
+SIGER_ALLOW_CPU_FULL_TRAIN=1 python lora/run_lora.py --config configs/training/general_lora.json
+python lora/run_lora.py --config configs/training/general_lora.json --no-hardware-policy
+```
+
 The runner reads:
 
 ```txt

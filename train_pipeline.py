@@ -15,6 +15,7 @@ import torch
 from config.model_config import SigerConfig
 from lora.config import LoRAConfig
 from lora.dataset import InstructionDataset
+from lora.hardware_policy import apply_lora_hardware_policy
 from lora.model import LoRAModel
 from lora.run_lora import infer_model_config_from_state_dict, load_checkpoint_state
 from lora.trainer import LoRATrainer
@@ -472,6 +473,11 @@ def run_lora_stage(config: PipelineConfig, base_checkpoint: Path) -> None:
     lora_config = LoRAConfig.from_json(config.lora_config)
     if lora_config.device == "auto":
         lora_config.device = hardware.device
+    lora_config, policy_changes = apply_lora_hardware_policy(lora_config, hardware)
+    if policy_changes:
+        print("\nLoRA hardware policy")
+        for change in policy_changes:
+            print(f"  - {change}")
     lora_config.base_checkpoint = str(base_checkpoint)
 
     print(f"Training dataset: {lora_config.dataset_path or lora_config.dataset_name}")

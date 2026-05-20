@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config.model_config import SigerConfig
 from lora.config import LoRAConfig
 from lora.dataset import InstructionDataset
+from lora.hardware_policy import apply_lora_hardware_policy
 from lora.model import LoRAModel
 from lora.trainer import LoRATrainer
 from model.siger_model import SigerLM
@@ -212,6 +213,11 @@ def parse_args() -> argparse.Namespace:
         "--config",
         help="Optional LoRA training config JSON, e.g. configs/training/general_lora.json",
     )
+    parser.add_argument(
+        "--no-hardware-policy",
+        action="store_true",
+        help="Disable automatic CPU/VRAM scaling for this run.",
+    )
     return parser.parse_args()
 
 
@@ -225,6 +231,14 @@ def main() -> None:
         configure_cpu(n_cores=n_cores)
 
     lora_config = load_lora_config(args.config, hardware.device)
+    if args.no_hardware_policy:
+        lora_config.auto_scale_for_hardware = False
+    lora_config, policy_changes = apply_lora_hardware_policy(lora_config, hardware)
+    if policy_changes:
+        print("\nLoRA hardware policy")
+        for change in policy_changes:
+            print(f"  - {change}")
+
     maybe_relaunch_with_torchrun(
         script_path=Path(__file__).resolve(),
         argv=sys.argv[1:],

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import random
 import re
@@ -19,9 +20,69 @@ DEFAULT_SYSTEM_PROMPT = (
     "Jawab sesuai instruksi user."
 )
 
+HTML_FIELD_NAMES = ("system", "instruction", "input", "output")
+WEB_HTML_RE = re.compile(
+    r"</?(?:p|br|div|span|ul|ol|li|a|strong|b|em|i|blockquote|h[1-6]|table|tr|td|th)\b[^>]*>|href\s*=",
+    flags=re.IGNORECASE,
+)
+HTML_TAG_RE = re.compile(r"<[^>\n]{1,500}>")
+HTML_HREF_ATTR_RE = re.compile(r"\s+href\s*=\s*([\"']).*?\1", flags=re.IGNORECASE)
+URL_RE = re.compile(r"\b(?:https?://|www\.)\S+", flags=re.IGNORECASE)
+CODE_CONTEXT_RE = re.compile(
+    r"```|<\?php|</?(?:html|head|body|script|style|template|form|input|button|select|option|textarea|svg|canvas)\b|"
+    r"\b(?:function|class|const|let|var|public|private|protected|import|export)\b",
+    flags=re.IGNORECASE,
+)
+
 
 def normalize_text(value: Any) -> str:
     return " ".join(str(value or "").strip().split())
+
+
+def is_code_like_row(row: dict[str, Any]) -> bool:
+    source = normalize_text(row.get("source")).lower()
+    task_type = normalize_text(row.get("type")).lower()
+    content = row_text(row)
+    return (
+        "code" in source
+        or "code" in task_type
+        or "laravel" in source
+        or "laravel" in task_type
+        or bool(CODE_CONTEXT_RE.search(content))
+    )
+
+
+def strip_web_html(text: str) -> tuple[str, bool]:
+    if not text:
+        return text, False
+
+    decoded = html.unescape(text).replace("\xa0", " ")
+    looks_like_web_html = bool(WEB_HTML_RE.search(decoded))
+    if not looks_like_web_html:
+        normalized = normalize_text(decoded)
+        return normalized, normalized != text
+
+    without_href = HTML_HREF_ATTR_RE.sub("", decoded)
+    without_tags = HTML_TAG_RE.sub(" ", without_href)
+    without_urls = URL_RE.sub("", without_tags)
+    cleaned = normalize_text(without_urls)
+    return cleaned, cleaned != normalize_text(text)
+
+
+def sanitize_web_html_row(row: dict[str, Any]) -> tuple[dict[str, Any], int]:
+    if is_code_like_row(row):
+        return row, 0
+
+    fixed = dict(row)
+    changed = 0
+    for field in HTML_FIELD_NAMES:
+        if field not in fixed:
+            continue
+        cleaned, did_change = strip_web_html(normalize_text(fixed.get(field)))
+        if did_change:
+            fixed[field] = cleaned
+            changed += 1
+    return fixed, changed
 
 
 def row_text(row: dict[str, Any]) -> str:
@@ -368,10 +429,14 @@ def filter_quality(
         "filtered_too_long": 0,
         "filtered_laravel_php_malformed": 0,
         "laravel_fences_repaired": 0,
+        "html_fields_sanitized": 0,
     }
     filtered: list[dict[str, Any]] = []
 
     for row in rows:
+        row, html_fields_sanitized = sanitize_web_html_row(row)
+        stats["html_fields_sanitized"] += html_fields_sanitized
+
         if max_row_tokens > 0 and row_token_count(row) > max_row_tokens:
             stats["filtered_too_long"] += 1
             continue
@@ -544,10 +609,11 @@ def main() -> None:
     print(f"Rows: {len(rows)}")
     print(f"Output: {registry.output_path}")
     print(f"Quality report: {report_path}")
-    if report["filtered_too_long"] or report["duplicates_removed"]:
+    if report["filtered_too_long"] or report["duplicates_removed"] or report["html_fields_sanitized"]:
         print(
             "Quality gate: "
             f"filtered_too_long={report['filtered_too_long']}, "
+            f"html_fields_sanitized={report['html_fields_sanitized']}, "
             f"duplicates_removed={report['duplicates_removed']}"
         )
 
