@@ -20,7 +20,7 @@ from optimization.hardware import detect_hardware, print_hardware_profile
 from tokenizer.hybrid_tokenizer import build_tokenizer
 
 
-def load_checkpoint_state(checkpoint_path: str) -> dict:
+def resolve_checkpoint_path(checkpoint_path: str) -> Path:
     path = Path(checkpoint_path)
     if not path.exists():
         latest_meta = path.parent / "latest.json"
@@ -41,7 +41,11 @@ def load_checkpoint_state(checkpoint_path: str) -> dict:
             "Pastikan base training sudah menghasilkan checkpoints/best_model.pt "
             "atau checkpoints/latest.json."
         )
+    return path
 
+
+def load_checkpoint_state(checkpoint_path: str | Path) -> dict:
+    path = resolve_checkpoint_path(str(checkpoint_path))
     checkpoint = torch.load(path, map_location="cpu")
     if isinstance(checkpoint, dict) and "model_state" in checkpoint:
         return checkpoint["model_state"]
@@ -113,12 +117,30 @@ def infer_model_config_from_state_dict(state_dict: dict) -> SigerConfig:
     )
 
 
-def load_base_model(checkpoint_path: str) -> SigerLM:
-    print("Loading base checkpoint...")
-    state_dict = load_checkpoint_state(checkpoint_path)
-    model_config = infer_model_config_from_state_dict(state_dict)
+def load_base_model_config(checkpoint_path: Path, state_dict: dict, max_seq_len: int) -> SigerConfig:
+    config_path = checkpoint_path.parent / "model_config.json"
+    if config_path.exists():
+        print(f"Loading base model config from {config_path}")
+        model_config = SigerConfig.from_json(str(config_path))
+    else:
+        print("model_config.json not found; inferring base model config from state_dict.")
+        model_config = infer_model_config_from_state_dict(state_dict)
 
-    print("Inferred base model config:")
+    model_config.max_seq_len = max_seq_len
+    return model_config
+
+
+def load_base_model(checkpoint_path: str, max_seq_len: int) -> SigerLM:
+    print("Loading base checkpoint...")
+    resolved_checkpoint_path = resolve_checkpoint_path(checkpoint_path)
+    state_dict = load_checkpoint_state(resolved_checkpoint_path)
+    model_config = load_base_model_config(
+        resolved_checkpoint_path,
+        state_dict,
+        max_seq_len=max_seq_len,
+    )
+
+    print("Loaded base model config:")
     print(f"   vocab_size : {model_config.vocab_size}")
     print(f"   d_model    : {model_config.d_model}")
     print(f"   n_layers   : {model_config.n_layers}")
@@ -127,6 +149,8 @@ def load_base_model(checkpoint_path: str) -> SigerLM:
     print(f"   expand     : {model_config.expand}")
     print(f"   norm       : {model_config.norm_type}")
     print(f"   moe        : {model_config.use_moe}")
+    print(f"   experts    : {model_config.moe_num_experts} (top_k={model_config.moe_top_k})")
+    print(f"   max_seq_len: {model_config.max_seq_len}")
 
     model = SigerLM(model_config)
     model.load_state_dict(state_dict, strict=True)
@@ -151,7 +175,7 @@ def default_lora_config(device: str) -> LoRAConfig:
         batch_size=256,
         grad_accum=1,
         warmup_steps=100,
-        max_seq_len=32,
+        max_seq_len=512,
         weight_decay=0.01,
         device=device,
         prefer_gpu=True,
@@ -210,7 +234,10 @@ def main() -> None:
     print(f"Training dataset: {lora_config.dataset_path or lora_config.dataset_name}")
     print(f"Save dir: {lora_config.save_dir}")
 
-    base_model = load_base_model(lora_config.base_checkpoint)
+    base_model = load_base_model(
+        lora_config.base_checkpoint,
+        max_seq_len=lora_config.max_seq_len,
+    )
 
     print("\nInjecting LoRA adapters...")
     lora_model = LoRAModel(base_model, lora_config)

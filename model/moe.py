@@ -46,12 +46,12 @@ class SparseMoE(nn.Module):
             ]
         )
         self.dropout = nn.Dropout(dropout)
-        self.last_aux_loss: torch.Tensor | None = None
-        self.last_switch_loss: torch.Tensor | None = None
-        self.last_importance_loss: torch.Tensor | None = None
-        self.last_expert_load: torch.Tensor | None = None
-        self.last_expert_importance: torch.Tensor | None = None
-        self.last_dead_expert_fraction: torch.Tensor | None = None
+        self.register_buffer("last_aux_loss", torch.tensor(0.0), persistent=False)
+        self.register_buffer("last_switch_loss", torch.tensor(0.0), persistent=False)
+        self.register_buffer("last_importance_loss", torch.tensor(0.0), persistent=False)
+        self.register_buffer("last_expert_load", torch.zeros(num_experts), persistent=False)
+        self.register_buffer("last_expert_importance", torch.zeros(num_experts), persistent=False)
+        self.register_buffer("last_dead_expert_fraction", torch.tensor(0.0), persistent=False)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         batch, seq_len, d_model = x.shape
@@ -60,30 +60,31 @@ class SparseMoE(nn.Module):
         gate_logits = self.gate(flat_x)
         if self.training and self.router_jitter > 0:
             gate_logits = gate_logits + torch.randn_like(gate_logits) * self.router_jitter
-        top_values, top_indices = torch.topk(gate_logits, self.top_k, dim=-1)
-        top_weights = F.softmax(top_values, dim=-1)
+
+        gate_probs = F.softmax(gate_logits, dim=-1)
+        top_weights, top_indices = torch.topk(gate_probs, self.top_k, dim=-1)
+        top_weights = top_weights / top_weights.sum(dim=-1, keepdim=True).clamp_min(1e-8)
 
         flat_out = torch.zeros_like(flat_x)
-        for expert_idx, expert in enumerate(self.experts):
+        for expert_idx in range(self.num_experts):
             mask = top_indices == expert_idx
             if not mask.any():
                 continue
 
             token_indices, route_slots = mask.nonzero(as_tuple=True)
             expert_input = flat_x.index_select(0, token_indices)
-            expert_output = expert(expert_input)
+            expert_output = self.experts[expert_idx](expert_input)
             weights = top_weights[token_indices, route_slots].unsqueeze(-1)
             flat_out.index_add_(0, token_indices, expert_output * weights)
 
-        self.last_aux_loss = self._load_balance_loss(gate_logits, top_indices)
+        self.last_aux_loss = self._load_balance_loss(gate_probs, top_indices)
         return self.dropout(flat_out.reshape(batch, seq_len, d_model))
 
     def _load_balance_loss(
         self,
-        gate_logits: torch.Tensor,
+        gate_probs: torch.Tensor,
         top_indices: torch.Tensor,
     ) -> torch.Tensor:
-        gate_probs = F.softmax(gate_logits, dim=-1)
         importance = gate_probs.mean(dim=0)
         selected = F.one_hot(top_indices, num_classes=self.num_experts).float()
         load = selected.sum(dim=1).mean(dim=0) / float(self.top_k)
@@ -105,3 +106,6 @@ class SparseMoE(nn.Module):
         self.last_dead_expert_fraction = (load == 0).float().mean().detach()
 
         return switch_loss + importance_loss
+
+
+MoEBranch = SparseMoE

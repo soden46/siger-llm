@@ -115,18 +115,24 @@ class LoRATrainer:
         Path(config.save_dir).mkdir(parents=True, exist_ok=True)
 
     def train(self, dataset: InstructionDataset):
-        elastic_state = install_signal_handlers() if self.config.elastic_recovery else None
+        elastic_state = install_signal_handlers() if getattr(self.config, "elastic_recovery", False) else None
         sampler = DistributedSampler(dataset, shuffle=True) if self.runtime.is_distributed else None
         loader_kwargs = {}
         if self.runtime.dataloader_workers > 0:
             loader_kwargs["persistent_workers"] = True
             loader_kwargs["prefetch_factor"] = 2
+
+        pad_token_id = getattr(
+            self.tokenizer,
+            "pad_token_id",
+            getattr(self.tokenizer, "pad_id", 100258),
+        )
         loader = DataLoader(
             dataset,
             batch_size=self.config.batch_size,
             shuffle=(sampler is None),
             sampler=sampler,
-            collate_fn=partial(collate_fn, pad_id=self.tokenizer.pad_id),
+            collate_fn=partial(collate_fn, pad_id=pad_token_id),
             num_workers=self.runtime.dataloader_workers,
             pin_memory=self.runtime.pin_memory,
             **loader_kwargs,
@@ -151,7 +157,7 @@ class LoRATrainer:
             device_type,
             enabled=(device_type == "cuda" and self.runtime.precision == "fp16"),
         )
-        last_loss = float("inf")
+        last_loss = 0.0
 
         while optimizer_step < self.config.max_steps:
             if self.runtime.is_distributed and hasattr(loader.sampler, "set_epoch"):
@@ -166,7 +172,7 @@ class LoRATrainer:
                 if attention_mask is not None:
                     tokens_since_step += int(attention_mask.sum().item())
                 else:
-                    tokens_since_step += int((input_ids != self.tokenizer.pad_id).sum().item())
+                    tokens_since_step += int((input_ids != pad_token_id).sum().item())
 
                 # Forward
                 with torch.autocast(
@@ -192,7 +198,6 @@ class LoRATrainer:
                     )
                     loss = loss / self.config.grad_accum
                 scaler.scale(loss).backward()
-                last_loss = loss.item() * self.config.grad_accum
                 micro_step += 1
 
                 if micro_step % self.config.grad_accum == 0:
@@ -200,11 +205,30 @@ class LoRATrainer:
                     torch.nn.utils.clip_grad_norm_(
                         self.model.parameters(), 1.0
                     )
+                    current_loss = loss.item() * self.config.grad_accum
+                    if self.runtime.is_distributed:
+                        loss_tensor = torch.tensor([current_loss], device=self.device)
+                        torch.distributed.all_reduce(
+                            loss_tensor,
+                            op=torch.distributed.ReduceOp.AVG,
+                        )
+                        current_loss = loss_tensor.item()
+
+                    scale_before_step = scaler.get_scale()
                     scaler.step(self.optimizer)
                     scaler.update()
+                    step_was_skipped = (
+                        scaler.is_enabled()
+                        and scaler.get_scale() < scale_before_step
+                    )
+
                     self.optimizer.zero_grad(set_to_none=True)
+                    if step_was_skipped:
+                        continue
+
                     lr = self.scheduler.step()
                     optimizer_step += 1
+                    last_loss = current_loss
 
                     now = time.time()
                     elapsed = max(now - last_step_time, 1e-9)
@@ -215,7 +239,7 @@ class LoRATrainer:
                     if self.runtime.is_main_process:
                         self.logger.log(
                             optimizer_step,
-                            last_loss,
+                            current_loss,
                             lr,
                             tokens_per_sec=tokens_per_sec,
                         )
@@ -225,15 +249,15 @@ class LoRATrainer:
                         and optimizer_step > 0
                         and optimizer_step % self.config.save_every == 0
                     ):
-                        self._save(optimizer_step, last_loss)
-                        if self.config.sharded_checkpoint:
+                        self._save(optimizer_step, current_loss)
+                        if getattr(self.config, "sharded_checkpoint", False):
                             save_sharded_checkpoint(
                                 model=self.model,
                                 optimizer=self.optimizer,
                                 scheduler=self.scheduler,
                                 output_dir=Path(self.config.save_dir) / f"sharded_step_{optimizer_step:06d}",
                                 step=optimizer_step,
-                                loss=last_loss,
+                                loss=current_loss,
                                 config=self.config.__dict__,
                             )
 
@@ -245,7 +269,7 @@ class LoRATrainer:
             barrier()
         if self.runtime.is_main_process:
             self._save(optimizer_step, last_loss)
-            if self.config.sharded_checkpoint:
+            if getattr(self.config, "sharded_checkpoint", False):
                 save_sharded_checkpoint(
                     model=self.model,
                     optimizer=self.optimizer,

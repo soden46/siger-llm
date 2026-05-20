@@ -2,6 +2,7 @@
 import torch
 import torch.nn as nn
 import psutil
+import time
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 from typing import Optional
@@ -179,8 +180,7 @@ class Trainer:
         """Main training loop."""
         elastic_state = install_signal_handlers() if self.config.get("elastic_recovery", True) else None
         dataloader = self._build_dataloader(dataset)
-        
-        # 1. Pastikan device_type string untuk GradScaler
+
         device_str = str(self.device)
         device_type = "cuda" if "cuda" in device_str else "cpu"
         scaler = torch.amp.GradScaler(
@@ -208,8 +208,12 @@ class Trainer:
 
         self.optimizer.zero_grad(set_to_none=True)
         epoch = 0
-        unscaled_loss = 0.0
-        
+        last_loss = 0.0
+        loss_accum = 0.0
+        micro_batches = 0
+        last_step_time = time.time()
+        steps_per_epoch = len(dataloader)
+
         while global_step < max_steps:
             epoch += 1
             if self.runtime.is_distributed and hasattr(dataloader.sampler, "set_epoch"):
@@ -233,21 +237,46 @@ class Trainer:
 
                 # Skala loss untuk mencegah underflow gradien pada FP16
                 scaler.scale(loss).backward()
-                unscaled_loss = loss.item() * self.accum_steps
+                loss_accum += loss.item() * self.accum_steps
+                micro_batches += 1
 
                 # Update weights setiap accum_steps
-                if (batch_idx + 1) % self.accum_steps == 0:
+                is_accum_step = micro_batches >= self.accum_steps
+                is_epoch_end = (batch_idx + 1) == steps_per_epoch
+                if is_accum_step or is_epoch_end:
                     # Unscale gradien sebelum clipping
                     scaler.unscale_(self.optimizer)
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.grad_clip)
 
                     # Optimizer step via Scaler
+                    scale_before_step = scaler.get_scale()
                     scaler.step(self.optimizer)
                     scaler.update()
                     self.optimizer.zero_grad(set_to_none=True)
+                    step_was_skipped = (
+                        scaler.is_enabled()
+                        and scaler.get_scale() < scale_before_step
+                    )
+
+                    actual_loss = loss_accum / max(1, micro_batches)
+                    loss_accum = 0.0
+                    micro_batches = 0
+
+                    if step_was_skipped:
+                        continue
+
+                    if self.runtime.is_distributed:
+                        loss_tensor = torch.tensor([actual_loss], device=self.device)
+                        torch.distributed.all_reduce(
+                            loss_tensor,
+                            op=torch.distributed.ReduceOp.AVG,
+                        )
+                        actual_loss = loss_tensor.item()
 
                     # LR scheduler step
                     lr = self.scheduler.step()
+                    global_step += 1
+                    last_loss = actual_loss
 
                     # Hitung throughput tokens
                     tokens_per_step = (
@@ -256,49 +285,62 @@ class Trainer:
                         * self.accum_steps
                         * max(1, self.runtime.world_size)
                     )
+                    now = time.time()
+                    elapsed = max(now - last_step_time, 1e-9)
+                    tokens_per_sec = tokens_per_step / elapsed
+                    last_step_time = now
 
                     # Logging
                     if self.runtime.is_main_process:
                         extra_metrics = {}
                         raw_model = unwrap_model(self.model)
                         moe_aux = getattr(raw_model, "last_moe_aux_loss", None)
+                        if moe_aux is None:
+                            moe_aux = getattr(raw_model, "last_aux_loss", None)
                         dead_experts = getattr(raw_model, "last_moe_dead_expert_fraction", None)
+                        if dead_experts is None:
+                            dead_experts = getattr(raw_model, "last_dead_expert_fraction", None)
                         if moe_aux is not None:
                             extra_metrics["moe_aux"] = float(moe_aux.detach().cpu().item())
                         if dead_experts is not None:
                             extra_metrics["moe_dead"] = float(dead_experts.detach().cpu().item())
                         self.logger.log(
                             global_step,
-                            unscaled_loss,
+                            actual_loss,
                             lr,
-                            tokens_per_step,
+                            tokens_per_sec,
                             extra_metrics=extra_metrics or None,
                         )
 
                     # 2. PERBAIKAN BUG: Simpan checkpoint & best model HANYA pada interval tertentu
                     save_every = self.config.get("save_every", 500)
-                    if self.runtime.is_main_process and global_step > 0 and global_step % save_every == 0:
-                        self.ckpt_manager.save(
-                            self.model, self.optimizer, self.scheduler,
-                            step=global_step, loss=unscaled_loss, config=self.config,
-                        )
-                        if self.config.get("sharded_checkpoint", False):
-                            save_sharded_checkpoint(
-                                model=self.model,
-                                optimizer=self.optimizer,
-                                scheduler=self.scheduler,
-                                output_dir=self.ckpt_manager.save_dir / f"sharded_step_{global_step:07d}",
-                                step=global_step,
-                                loss=unscaled_loss,
-                                config=self.config,
-                            )
-                        
-                        # Cek dan simpan model terbaik di interval ini saja untuk menghemat I/O disk
-                        if unscaled_loss < best_loss:
-                            best_loss = unscaled_loss
-                            self._save_best()
+                    if global_step > 0 and global_step % save_every == 0:
+                        if self.runtime.is_distributed:
+                            barrier()
 
-                    global_step += 1
+                        if self.runtime.is_main_process:
+                            self.ckpt_manager.save(
+                                self.model, self.optimizer, self.scheduler,
+                                step=global_step, loss=actual_loss, config=self.config,
+                            )
+                            if self.config.get("sharded_checkpoint", False):
+                                save_sharded_checkpoint(
+                                    model=self.model,
+                                    optimizer=self.optimizer,
+                                    scheduler=self.scheduler,
+                                    output_dir=self.ckpt_manager.save_dir / f"sharded_step_{global_step:07d}",
+                                    step=global_step,
+                                    loss=actual_loss,
+                                    config=self.config,
+                                )
+
+                            # Cek dan simpan model terbaik di interval ini saja untuk menghemat I/O disk
+                            if actual_loss < best_loss:
+                                best_loss = actual_loss
+                                self._save_best()
+
+                        if self.runtime.is_distributed:
+                            barrier()
 
             if elastic_state and elastic_state.should_stop:
                 break
@@ -311,7 +353,7 @@ class Trainer:
             # Final save
             self.ckpt_manager.save(
                 self.model, self.optimizer, self.scheduler,
-                step=global_step, loss=unscaled_loss, config=self.config,
+                step=global_step, loss=last_loss, config=self.config,
             )
             if self.config.get("sharded_checkpoint", False):
                 save_sharded_checkpoint(
@@ -320,10 +362,10 @@ class Trainer:
                     scheduler=self.scheduler,
                     output_dir=self.ckpt_manager.save_dir / "sharded_final",
                     step=global_step,
-                    loss=unscaled_loss,
+                    loss=last_loss,
                     config=self.config,
                 )
-            if unscaled_loss < best_loss or not self._best_path().exists():
+            if last_loss < best_loss or not self._best_path().exists():
                 self._save_best()
 
         if self.runtime.is_distributed:

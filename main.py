@@ -17,11 +17,13 @@ from optimization.moe_sizing import resolve_adaptive_moe_settings
 
 MODEL_PROFILES = {
     "small": {"d_model": 256, "n_layers": 8, "max_seq_len": 128},
-    "small_context": {"d_model": 256, "n_layers": 8, "max_seq_len": 256},
+    "small_context": {"d_model": 512, "n_layers": 12, "max_seq_len": 512},
+    
+    # JALUR 1: OPTIMALISASI MOE (Total sekitar ~100M Parameter jika digabung)
     "small_moe": {
-        "d_model": 256,
-        "n_layers": 8,
-        "max_seq_len": 128,
+        "d_model": 384,             # Diubah dari 512 agar seimbang per expert
+        "n_layers": 10,             # Diubah dari 12 agar tidak overfit di GPU T4
+        "max_seq_len": 512,         # Sweet spot panjang sekuens token
         "use_moe": True,
         "moe_num_experts": 8,
         "moe_top_k": 2,
@@ -29,6 +31,14 @@ MODEL_PROFILES = {
         "moe_layers_every": 2,
         "moe_aux_loss_weight": 0.01,
     },
+    
+    # JALUR 2: TAMBAHKAN PROFIL DENSE BARU (~75M - 85M Parameter murni)
+    "siger_medium": {
+        "d_model": 512, 
+        "n_layers": 12, 
+        "max_seq_len": 512          # Set ke 512 sesuai rekomendasi pemotongan token corpus
+    },
+    
     "base": {"d_model": 512, "n_layers": 12, "max_seq_len": 256},
     "reasoning_base": {"d_model": 512, "n_layers": 12, "max_seq_len": 512},
 }
@@ -41,7 +51,7 @@ TRAIN_CONFIG = {
     # backend/vocab changes.
     
     # Model kecil dulu buat smoke test
-    "model_profile": "small",
+    "model_profile": "siger_medium",
     "d_state": 16,
     "expand": 2,
     "d_conv": 4,

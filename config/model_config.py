@@ -147,14 +147,14 @@ class SigerConfig:
 
     @classmethod
     def small(cls) -> "SigerConfig":
-        return cls(d_model=256, n_layers=8, max_seq_len=1024)
+        return cls(d_model=256, n_layers=8, max_seq_len=512)
 
     @classmethod
     def small_moe(cls) -> "SigerConfig":
         return cls(
-            d_model=256,
-            n_layers=8,
-            max_seq_len=1024,
+            d_model=384,
+            n_layers=10,
+            max_seq_len=512,
             use_moe=True,
             moe_num_experts=8,
             moe_top_k=2,
@@ -164,7 +164,7 @@ class SigerConfig:
 
     @classmethod
     def base(cls) -> "SigerConfig":
-        return cls(d_model=512, n_layers=12, max_seq_len=2048)
+        return cls(d_model=512, n_layers=12, max_seq_len=512)
 
     @classmethod
     def medium(cls) -> "SigerConfig":

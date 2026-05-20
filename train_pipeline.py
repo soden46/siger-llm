@@ -325,7 +325,7 @@ def main() -> None:
     if config.force_stage in {None, "dense"} and not is_dense_ready(config, dense_meta):
         write_state(config, "dense", "running", latest=dense_meta)
         dense_meta = run_base_stage(
-            profile_name="small",
+            profile_name="siger_medium",
             max_steps=config.dense_max_steps,
             checkpoint_dir=config.dense_checkpoint_dir,
             resume=True,
