@@ -88,6 +88,48 @@ SIGER_MODEL_PROFILE=reasoning_base python main.py
 
 Profile default tetap `small` (`d_model=256`, `n_layers=8`, `max_seq_len=128`) agar smoke test Kaggle lebih aman. Profile `small_context` mempertahankan ukuran 11.8M tetapi menaikkan context training ke `max_seq_len=256`. Profile `base` memakai `d_model=512`, `n_layers=12`; profile `reasoning_base` menaikkan context training ke `max_seq_len=512`.
 
+Adaptive dense -> MoE -> LoRA pipeline:
+
+```powershell
+python train_pipeline.py --lora-config configs\training\general_lora.json
+```
+
+Default trigger:
+
+```txt
+dense -> MoE: step >= 1500 and loss <= 3.5
+MoE -> LoRA: latest checkpoint loss delta <= 0.005
+```
+
+Lampung adapter pipeline:
+
+```powershell
+python train_pipeline.py --lora-config configs\training\lampung_lora.json
+```
+
+Manual adaptive MoE base training:
+
+```powershell
+$env:SIGER_MODEL_PROFILE="small_moe"
+python main.py
+```
+
+Exact static MoE fallback:
+
+```powershell
+$env:SIGER_DISABLE_ADAPTIVE_MOE="1"
+$env:SIGER_MODEL_PROFILE="small_moe"
+python main.py
+```
+
+Jika ingin menguji satu stage saja:
+
+```powershell
+python train_pipeline.py --force-stage dense
+python train_pipeline.py --force-stage moe
+python train_pipeline.py --force-stage lora --lora-config configs\training\general_lora.json
+```
+
 ## 5. Build Dataset Lampung
 
 ```powershell

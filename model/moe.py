@@ -21,6 +21,7 @@ class SparseMoE(nn.Module):
         top_k: int = 2,
         hidden_mult: int = 2,
         dropout: float = 0.0,
+        router_jitter: float = 0.01,
     ) -> None:
         super().__init__()
         if num_experts < 1:
@@ -30,6 +31,7 @@ class SparseMoE(nn.Module):
 
         self.num_experts = int(num_experts)
         self.top_k = int(top_k)
+        self.router_jitter = float(router_jitter)
         hidden_dim = int(d_model * hidden_mult)
 
         self.gate = nn.Linear(d_model, num_experts, bias=False)
@@ -45,12 +47,19 @@ class SparseMoE(nn.Module):
         )
         self.dropout = nn.Dropout(dropout)
         self.last_aux_loss: torch.Tensor | None = None
+        self.last_switch_loss: torch.Tensor | None = None
+        self.last_importance_loss: torch.Tensor | None = None
+        self.last_expert_load: torch.Tensor | None = None
+        self.last_expert_importance: torch.Tensor | None = None
+        self.last_dead_expert_fraction: torch.Tensor | None = None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         batch, seq_len, d_model = x.shape
         flat_x = x.reshape(batch * seq_len, d_model)
 
         gate_logits = self.gate(flat_x)
+        if self.training and self.router_jitter > 0:
+            gate_logits = gate_logits + torch.randn_like(gate_logits) * self.router_jitter
         top_values, top_indices = torch.topk(gate_logits, self.top_k, dim=-1)
         top_weights = F.softmax(top_values, dim=-1)
 
@@ -78,4 +87,21 @@ class SparseMoE(nn.Module):
         importance = gate_probs.mean(dim=0)
         selected = F.one_hot(top_indices, num_classes=self.num_experts).float()
         load = selected.sum(dim=1).mean(dim=0) / float(self.top_k)
-        return self.num_experts * torch.sum(importance * load)
+
+        uniform = torch.full_like(importance, 1.0 / float(self.num_experts))
+
+        # Switch-style loss: penalizes mismatch between probability mass and
+        # actual top-k assignments. Minimum is near 1.0 when routing is uniform.
+        switch_loss = self.num_experts * torch.sum(importance * load.detach())
+
+        # Direct differentiable pressure on router probabilities. This helps
+        # early training before top-k assignments have become diverse.
+        importance_loss = self.num_experts * torch.sum((importance - uniform).pow(2))
+
+        self.last_switch_loss = switch_loss.detach()
+        self.last_importance_loss = importance_loss.detach()
+        self.last_expert_load = load.detach()
+        self.last_expert_importance = importance.detach()
+        self.last_dead_expert_fraction = (load == 0).float().mean().detach()
+
+        return switch_loss + importance_loss

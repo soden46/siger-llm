@@ -54,6 +54,56 @@ python main.py
 
 The `small_moe` profile keeps the same general SSM/Mamba-like core but adds sparse experts on selected blocks. It increases capacity without making Lampung, Laravel, or any domain rule part of the core model.
 
+## Adaptive Training Pipeline
+
+`train_pipeline.py` can run the dense -> MoE -> LoRA flow automatically with metric gates:
+
+```powershell
+python train_pipeline.py --lora-config configs\training\general_lora.json
+```
+
+Default gates:
+
+```txt
+dense -> MoE: step >= 1500 and loss <= 3.5
+MoE -> LoRA: latest checkpoint loss delta <= 0.005
+```
+
+The dense stage writes checkpoints to `checkpoints/auto/dense`. When the dense gate passes, the MoE stage is warm-started from the dense checkpoint with shared SSM/tokenizer weights loaded and new MoE tensors initialized as additional capacity. The dense SigerLM block has no standalone dense FFN to clone into experts, so the transition intentionally copies compatible SSM weights instead of pretending an FFN copy exists.
+
+The MoE stage writes checkpoints to `checkpoints/auto/moe`. Before that stage starts, `optimization/moe_sizing.py` chooses `moe_num_experts`, `moe_top_k`, and `moe_layers_every` from the current hardware profile and the latest dense loss. This keeps CPU/VPS runs conservative while giving stronger CUDA runs more expert capacity. When the plateau gate passes, LoRA is trained from the latest MoE checkpoint and merged according to the selected LoRA config.
+
+MoE training includes anti-collapse routing pressure:
+
+```txt
+loss = language_model_loss + moe_aux_loss_weight * load_balance_loss
+```
+
+`SparseMoE` combines Switch-style load balancing, a router importance penalty, and small training-time router jitter. During MoE runs, the training log can include:
+
+```txt
+moe_aux=...
+moe_dead=...
+```
+
+`moe_dead` should trend toward `0.0`; sustained high values mean some experts are not receiving tokens and `moe_aux_loss_weight` or `moe_router_jitter` may need to be increased.
+
+Useful overrides:
+
+```powershell
+python train_pipeline.py --dense-loss-threshold 4.0 --dense-min-steps 1000
+python train_pipeline.py --moe-plateau-delta 0.01 --lora-config configs\training\lampung_lora.json
+python train_pipeline.py --force-stage lora --lora-config configs\training\general_lora.json
+```
+
+For manual MoE experiments through `main.py`, adaptive sizing is enabled for `SIGER_MODEL_PROFILE=small_moe` by default. Disable it only when exact static expert counts are required:
+
+```powershell
+$env:SIGER_DISABLE_ADAPTIVE_MOE="1"
+$env:SIGER_MODEL_PROFILE="small_moe"
+python main.py
+```
+
 ## Instruction Corpus Builder
 
 Unified instruction corpus builder:

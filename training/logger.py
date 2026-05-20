@@ -16,7 +16,14 @@ class TrainingLogger:
         self.step_times   = deque(maxlen=50)
         self._last_time   = time.time()
 
-    def log(self, step: int, loss: float, lr: float, tokens_per_sec: float = 0):
+    def log(
+        self,
+        step: int,
+        loss: float,
+        lr: float,
+        tokens_per_sec: float = 0,
+        extra_metrics: dict[str, float] | None = None,
+    ):
         self.loss_window.append(loss)
         now = time.time()
         self.step_times.append(now - self._last_time)
@@ -28,6 +35,12 @@ class TrainingLogger:
             elapsed    = now - self.start_time
             perplexity = min(math.exp(avg_loss), 99999)
 
+            extras = ""
+            if extra_metrics:
+                extras = " | " + " | ".join(
+                    f"{name}={value:.4f}" for name, value in extra_metrics.items()
+                )
+
             print(
                 f"step={step:>7,} | "
                 f"loss={loss:.4f} | "
@@ -36,6 +49,7 @@ class TrainingLogger:
                 f"lr={lr:.2e} | "
                 f"tok/s={tokens_per_sec:,.0f} | "
                 f"elapsed={elapsed/60:.1f}m"
+                f"{extras}"
             )
 
     def summary(self, total_steps: int):

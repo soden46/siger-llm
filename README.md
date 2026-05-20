@@ -51,6 +51,9 @@ Kalau kamu tertarik dengan low-resource language AI, infrastruktur AI Indonesia,
 - Base training pipeline: dataset, optimizer, scheduler, checkpoint, logging
 - Custom LoRA fine-tuning untuk instruction tuning
 - Config-driven LoRA runner untuk general dan Lampung adapters
+- Adaptive training pipeline: Dense SSM -> hardware/metric-aware MoE -> LoRA
+- Adaptive Sparse MoE sizing: jumlah expert, `top_k`, dan frekuensi layer MoE dipilih dari budget hardware dan loss checkpoint
+- Anti-collapse MoE routing: load-balance loss, router importance penalty, jitter eksplorasi, dan metrik `moe_dead`
 - Unified instruction corpus builder berbasis dataset registry
 - Inference generator, chat session, router, dan Lampung domain pipeline
 - Retrieval/rule layer untuk Lampung lookup dan compositional translation
@@ -102,7 +105,7 @@ raw data / domain data
   -> tools/build_* or dataset registry
   -> unified instruction corpus
   -> tokenizer/hybrid_tokenizer.py
-  -> base training or LoRA fine-tuning
+  -> base training / adaptive Dense -> MoE -> LoRA pipeline
   -> merged checkpoint
   -> inference router
   -> general chat or Lampung domain tools
@@ -329,6 +332,14 @@ Lampung instruction corpus: 30701 rows
 
 ## Training
 
+Adaptive Dense -> MoE -> LoRA pipeline:
+
+```powershell
+python train_pipeline.py --lora-config configs\training\general_lora.json
+```
+
+The pipeline starts from the dense SSM baseline, expands to Sparse MoE only after the dense checkpoint passes the configured loss/step gate, then trains LoRA after the MoE curve plateaus. During the MoE expansion stage, SigerLM chooses a conservative expert layout from the current hardware and the latest dense loss, so small CPU/VPS runs get fewer active experts while stronger CUDA runs can use more capacity.
+
 Lampung-only LoRA:
 
 ```powershell
@@ -544,6 +555,7 @@ DISTRIBUTED_TRAINING_ROADMAP.md
 
 ### Training and Model Development
 
+- Use `train_pipeline.py` for reproducible Dense -> adaptive MoE -> LoRA experiments
 - Train and evaluate `general_lora.json`
 - Improve base training recipes
 - Train base model more seriously on larger corpus

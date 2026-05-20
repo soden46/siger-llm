@@ -63,6 +63,7 @@ class SigerConfig:
     moe_expert_hidden_mult: int = 2
     moe_layers_every: int = 2
     moe_aux_loss_weight: float = 0.01
+    moe_router_jitter: float = 0.01
 
     def __post_init__(self):
         self.activation = self.activation.lower()
@@ -80,6 +81,8 @@ class SigerConfig:
             raise ValueError("moe_top_k must be in [1, moe_num_experts]")
         if self.moe_layers_every < 1:
             raise ValueError("moe_layers_every must be >= 1")
+        if self.moe_router_jitter < 0:
+            raise ValueError("moe_router_jitter must be >= 0")
         self.model_base_name = SIGER_BASE_NAME
         self.model_alias = canonical_model_name(self.model_alias)
 

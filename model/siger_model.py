@@ -50,6 +50,8 @@ class SigerLM(nn.Module):
         # embedding weight dan output projection weight dibagi
         # supaya parameter lebih hemat dan representasi lebih konsisten.
         self.lm_head.weight = self.embedding.weight
+        self.last_moe_aux_loss = None
+        self.last_moe_dead_expert_fraction = None
 
     def _init_weights(self, module):
         std = getattr(self.config, "initializer_range", 0.02)
@@ -125,6 +127,21 @@ class SigerLM(nn.Module):
                     if getattr(layer, "last_moe_loss", None) is not None
                 ]
                 if aux_losses:
-                    loss = loss + moe_aux_weight * torch.stack(aux_losses).mean()
+                    self.last_moe_aux_loss = torch.stack(aux_losses).mean()
+                    loss = loss + moe_aux_weight * self.last_moe_aux_loss
+                else:
+                    self.last_moe_aux_loss = None
+
+            dead_fractions = [
+                layer.moe.last_dead_expert_fraction
+                for layer in self.layers
+                if getattr(layer, "use_moe", False)
+                and getattr(layer, "moe", None) is not None
+                and getattr(layer.moe, "last_dead_expert_fraction", None) is not None
+            ]
+            if dead_fractions:
+                self.last_moe_dead_expert_fraction = torch.stack(dead_fractions).mean()
+            else:
+                self.last_moe_dead_expert_fraction = None
 
         return logits, loss

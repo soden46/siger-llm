@@ -299,11 +299,11 @@ MoE experiment path:
 ```txt
 SIGER_MODEL_PROFILE="small_moe"
 -> use_moe=True
--> moe_num_experts=8
--> moe_top_k=2
--> moe_layers_every=2
+-> adaptive resolver chooses moe_num_experts / moe_top_k / moe_layers_every
 -> moe_aux_loss_weight=0.01
 ```
+
+The static fallback profile starts from `8 experts`, `top_k=2`, and `moe_layers_every=2`, but `main.py` and `train_pipeline.py` now pass MoE settings through `optimization/moe_sizing.py` unless adaptive sizing is explicitly disabled. This lets the same codebase avoid overbuilding experts on a small CPU/VPS while allowing larger CUDA runs to activate more expert capacity.
 
 The MoE branch is still domain-neutral. It must not contain hard-coded Lampung, Laravel, or routing logic. Any specialization should emerge from data and adapter training, while explicit domain behavior remains in `retrieval/` and `inference/`.
 
@@ -363,7 +363,79 @@ if use_moe and layer_is_moe:
     hidden = hidden + dropout(expert_out)
 ```
 
-`SparseMoE` memakai gate per token, memilih `top_k` experts, lalu menambahkan auxiliary load-balance loss kecil saat training agar routing tidak jatuh ke satu expert saja.
+`SparseMoE` memakai gate per token, memilih `top_k` experts, lalu menambahkan auxiliary load-balance loss saat training agar routing tidak jatuh ke satu expert saja.
+
+Anti-collapse behavior:
+
+- Switch-style load-balance loss menghubungkan probabilitas router dengan expert yang benar-benar dipilih.
+- Importance penalty mendorong rata-rata probabilitas router mendekati distribusi uniform, terutama di awal training saat top-k routing belum stabil.
+- Router jitter kecil saat training memberi eksplorasi awal agar expert yang kalah start tetap punya peluang dipilih.
+- Training log menampilkan `moe_aux` dan `moe_dead`; `moe_dead=0.2500` berarti sekitar 25% expert tidak menerima token pada batch/layer MoE terakhir.
+
+Total training loss saat `use_moe=True`:
+
+```txt
+loss = cross_entropy + moe_aux_loss_weight * mean(moe_aux_loss_per_moe_layer)
+```
+
+Default `moe_aux_loss_weight=0.01` sengaja kecil agar router belajar membagi beban tanpa mengalahkan objective bahasa utama.
+
+### Adaptive MoE Sizing
+
+Adaptive MoE sizing is resolved at stage boundaries, not in the middle of an optimizer step. This keeps checkpoint shape, optimizer state, and distributed training behavior predictable.
+
+Inputs:
+
+- hardware profile from `optimization/hardware.py`
+- latest dense checkpoint loss when available
+- conservative bounds such as `min_experts=2` and `max_experts=16`
+
+Outputs:
+
+- `moe_num_experts`
+- `moe_top_k`
+- `moe_layers_every`
+
+Hardware policy:
+
+```txt
+low CPU/RAM VPS
+-> fewer experts, top_k=1, MoE on fewer layers
+
+standard CUDA
+-> moderate experts, top_k=2
+
+large CUDA / multi-GPU
+-> more experts, higher top_k, MoE on more layers
+```
+
+Learning policy:
+
+```txt
+dense loss still unstable
+-> shrink expert count and keep routing simple
+
+dense loss passes expansion gate
+-> enable baseline expert capacity
+
+dense loss is mature
+-> add expert capacity for specialization
+```
+
+This is different from per-token routing. `SparseMoE` still dynamically routes each token to its best experts during forward pass. Adaptive sizing decides how many experts the model should instantiate before the MoE training stage starts.
+
+The automatic training flow is:
+
+```txt
+Dense SSM stage
+  -> gate: step/loss threshold
+  -> Adaptive MoE resolver: hardware + dense loss
+  -> MoE expansion stage
+  -> gate: plateau / loss delta
+  -> LoRA specialization
+```
+
+Because SigerLM blocks do not contain a standalone dense FFN, Dense -> MoE warm-start copies compatible embedding, SSM, norm, and projection weights, then initializes new expert tensors as additional capacity. It does not fabricate an FFN-to-expert copy that does not exist in the architecture.
 
 ## 8. SSM Core: Selective State Space
 

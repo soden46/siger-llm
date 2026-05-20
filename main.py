@@ -11,6 +11,8 @@ from training.text_sources import resolve_text_sources
 from training.trainer      import Trainer
 from model.ssm_core import SSMCore
 from optimization.gpu import maybe_relaunch_with_torchrun
+from optimization.hardware import detect_hardware
+from optimization.moe_sizing import resolve_adaptive_moe_settings
 
 
 MODEL_PROFILES = {
@@ -136,6 +138,23 @@ def main():
     print(f"Tokenizer backend: {tok.backend} | vocab_size={tok.vocab_size}")
     TRAIN_CONFIG["vocab_size"] = tok.vocab_size
 
+    if TRAIN_CONFIG.get("use_moe", False) and os.environ.get("SIGER_DISABLE_ADAPTIVE_MOE", "0") != "1":
+        hardware = detect_hardware(prefer_gpu=TRAIN_CONFIG.get("prefer_gpu", True))
+        moe_settings = resolve_adaptive_moe_settings(
+            hardware,
+            max_experts=int(TRAIN_CONFIG.get("moe_max_experts", 16)),
+        )
+        TRAIN_CONFIG["moe_num_experts"] = moe_settings.num_experts
+        TRAIN_CONFIG["moe_top_k"] = moe_settings.top_k
+        TRAIN_CONFIG["moe_layers_every"] = moe_settings.layers_every
+        print(
+            "Adaptive MoE settings: "
+            f"experts={moe_settings.num_experts}, "
+            f"top_k={moe_settings.top_k}, "
+            f"layers_every={moe_settings.layers_every} "
+            f"({moe_settings.reason})"
+        )
+
     # 2. Dataset sources
     text_paths = resolve_text_sources(TRAIN_CONFIG)
 
@@ -186,6 +205,7 @@ def main():
         moe_expert_hidden_mult=TRAIN_CONFIG.get("moe_expert_hidden_mult", 2),
         moe_layers_every=TRAIN_CONFIG.get("moe_layers_every", 2),
         moe_aux_loss_weight=TRAIN_CONFIG.get("moe_aux_loss_weight", 0.01),
+        moe_router_jitter=TRAIN_CONFIG.get("moe_router_jitter", 0.01),
     )
     TRAIN_CONFIG["d_inner"] = model_config.d_inner
     TRAIN_CONFIG["d_state"] = model_config.d_state

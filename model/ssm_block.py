@@ -70,6 +70,7 @@ class SSMBlock(nn.Module):
                 top_k=int(getattr(config, "moe_top_k", 2)),
                 hidden_mult=int(getattr(config, "moe_expert_hidden_mult", 2)),
                 dropout=float(getattr(config, "dropout", 0.0)),
+                router_jitter=float(getattr(config, "moe_router_jitter", 0.01)),
             )
 
     def forward(self, x):

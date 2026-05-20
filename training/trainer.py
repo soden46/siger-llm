@@ -259,7 +259,21 @@ class Trainer:
 
                     # Logging
                     if self.runtime.is_main_process:
-                        self.logger.log(global_step, unscaled_loss, lr, tokens_per_step)
+                        extra_metrics = {}
+                        raw_model = unwrap_model(self.model)
+                        moe_aux = getattr(raw_model, "last_moe_aux_loss", None)
+                        dead_experts = getattr(raw_model, "last_moe_dead_expert_fraction", None)
+                        if moe_aux is not None:
+                            extra_metrics["moe_aux"] = float(moe_aux.detach().cpu().item())
+                        if dead_experts is not None:
+                            extra_metrics["moe_dead"] = float(dead_experts.detach().cpu().item())
+                        self.logger.log(
+                            global_step,
+                            unscaled_loss,
+                            lr,
+                            tokens_per_step,
+                            extra_metrics=extra_metrics or None,
+                        )
 
                     # 2. PERBAIKAN BUG: Simpan checkpoint & best model HANYA pada interval tertentu
                     save_every = self.config.get("save_every", 500)
