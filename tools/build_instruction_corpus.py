@@ -218,6 +218,55 @@ def convert_text_completion(source: DatasetSource) -> list[dict[str, Any]]:
     return rows
 
 
+def convert_mined_parallel_jsonl(source: DatasetSource) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+
+    for raw in iter_jsonl(source.path):
+        text_id = normalize_text(raw.get("text_id"))
+        text_lam_o = normalize_text(raw.get("text_lam_o"))
+        text_en = normalize_text(raw.get("text_en"))
+        category = normalize_text(raw.get("_category"))
+        system_prompt = source.system_prompt or DEFAULT_SYSTEM_PROMPT
+
+        if text_lam_o and text_id:
+            rows.append(
+                instruction_row(
+                    instruction="Terjemahkan teks Lampung Dialek O berikut ke Bahasa Indonesia.",
+                    input_text=text_lam_o,
+                    output=text_id,
+                    system_prompt=system_prompt,
+                    source=source.name,
+                    task_type=source.metadata.get("type", "lampung_o_to_id"),
+                )
+            )
+            continue
+
+        if text_id:
+            rows.append(
+                instruction_row(
+                    instruction=f"Tulis teks informatif dalam Bahasa Indonesia tentang: {category or 'pengetahuan umum'}.",
+                    output=text_id,
+                    system_prompt=system_prompt,
+                    source=source.name,
+                    task_type=source.metadata.get("type", "general_id_text"),
+                )
+            )
+            continue
+
+        if text_en:
+            rows.append(
+                instruction_row(
+                    instruction=f"Write an informative text in English about: {category or 'general knowledge'}.",
+                    output=text_en,
+                    system_prompt=system_prompt,
+                    source=source.name,
+                    task_type=source.metadata.get("type", "general_en_text"),
+                )
+            )
+
+    return rows
+
+
 def convert_source(source: DatasetSource) -> list[dict[str, Any]]:
     if source.format == "instruction_jsonl":
         rows = convert_instruction_jsonl(source)
@@ -225,6 +274,8 @@ def convert_source(source: DatasetSource) -> list[dict[str, Any]]:
         rows = convert_chat_jsonl(source)
     elif source.format == "text_completion":
         rows = convert_text_completion(source)
+    elif source.format == "mined_parallel_jsonl":
+        rows = convert_mined_parallel_jsonl(source)
     else:
         raise ValueError(f"Unsupported dataset source format: {source.format}")
 

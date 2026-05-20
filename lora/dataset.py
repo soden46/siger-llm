@@ -25,6 +25,14 @@ SYSTEM_PROMPT = (
 )
 
 
+def _chat_format(system_prompt: str, user_message: str, assistant_message: str) -> str:
+    return (
+        f"<|system|>{system_prompt}<|end_turn|>\n"
+        f"<|user|>{user_message}<|end_turn|>\n"
+        f"<|assistant|>{assistant_message}<|end_turn|>"
+    )
+
+
 def format_local_instruction(example: Dict) -> str:
     """
     Format dataset JSONL lokal Lampung:
@@ -46,6 +54,11 @@ def format_local_instruction(example: Dict) -> str:
     output = str(example.get("output", "")).strip()
 
     if not instruction or not output:
+        mined_text = format_mined_parallel_row(example, system_prompt)
+        if mined_text:
+            return mined_text
+
+    if not instruction or not output:
         return ""
 
     if input_text:
@@ -61,11 +74,44 @@ def format_local_instruction(example: Dict) -> str:
     else:
         assistant_message = output
 
-    return (
-        f"<|system|>{system_prompt}<|end_turn|>\n"
-        f"<|user|>{user_message}<|end_turn|>\n"
-        f"<|assistant|>{assistant_message}<|end_turn|>"
-    )
+    return _chat_format(system_prompt, user_message, assistant_message)
+
+
+def format_mined_parallel_row(example: Dict, system_prompt: str) -> str:
+    """Fallback for mined parallel/general rows.
+
+    Supported shape:
+    {"text_id": "...", "text_lam_o": "...", "text_en": "...", "_category": "..."}
+    """
+    text_id = str(example.get("text_id", "")).strip()
+    text_lam_o = str(example.get("text_lam_o", "")).strip()
+    text_en = str(example.get("text_en", "")).strip()
+    category = str(example.get("_category", "")).strip()
+
+    if text_lam_o and text_id:
+        return _chat_format(
+            system_prompt,
+            f"Terjemahkan teks Lampung Dialek O berikut ke Bahasa Indonesia.\n\n{text_lam_o}",
+            text_id,
+        )
+
+    if text_id:
+        topic = category or "pengetahuan umum"
+        return _chat_format(
+            system_prompt,
+            f"Tulis teks informatif dalam Bahasa Indonesia tentang: {topic}.",
+            text_id,
+        )
+
+    if text_en:
+        topic = category or "general knowledge"
+        return _chat_format(
+            system_prompt,
+            f"Write an informative text in English about: {topic}.",
+            text_en,
+        )
+
+    return ""
 
 
 def format_hf_instruction(example: Dict, dataset_name: str) -> str:

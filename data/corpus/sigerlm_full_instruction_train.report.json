@@ -1,0 +1,51 @@
+{
+  "registry": "sigerlm_full_instruction",
+  "output_path": "data/corpus/sigerlm_full_instruction_train.jsonl",
+  "max_row_tokens": 0,
+  "strict_laravel_php": true,
+  "sources": [
+    {
+      "name": "general_instruction",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 30704
+    },
+    {
+      "name": "lampung_instruction",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 30701
+    },
+    {
+      "name": "general_assistant_mining",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 31681
+    },
+    {
+      "name": "reasoning_instruction",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 15
+    },
+    {
+      "name": "software_engineering_instruction",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 28
+    },
+    {
+      "name": "sigerlm_mined_parallel",
+      "format": "mined_parallel_jsonl",
+      "weight": 1,
+      "rows_after_weight": 8650
+    }
+  ],
+  "rows_before_quality": 101779,
+  "filtered_too_long": 0,
+  "filtered_laravel_php_malformed": 0,
+  "laravel_fences_repaired": 0,
+  "rows_after_quality": 101779,
+  "duplicates_removed": 61418,
+  "rows_after_dedupe": 40361
+}

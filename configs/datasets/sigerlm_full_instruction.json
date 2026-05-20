@@ -1,0 +1,52 @@
+{
+  "name": "sigerlm_full_instruction",
+  "output_path": "data/corpus/sigerlm_full_instruction_train.jsonl",
+  "shuffle_seed": 42,
+  "sources": [
+    {
+      "name": "general_instruction",
+      "path": "data/corpus/general_instruction_train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI umum yang cerdas, ringkas, dan akurat."
+    },
+    {
+      "name": "lampung_instruction",
+      "path": "data/corpus/lampung_instruction_train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI umum dengan kemampuan khusus Bahasa Lampung. Jawab akurat dan ringkas."
+    },
+    {
+      "name": "general_assistant_mining",
+      "path": "data/corpus/general_assistant_mining_train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI umum yang cerdas, ringkas, dan akurat."
+    },
+    {
+      "name": "reasoning_instruction",
+      "path": "data/corpus/reasoning_instruction_train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI yang bernalar runtut dan menjawab dengan akurat."
+    },
+    {
+      "name": "software_engineering_instruction",
+      "path": "data/corpus/software_engineering_instruction_train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI yang membantu rekayasa perangkat lunak dan pemrograman."
+    },
+    {
+      "name": "sigerlm_mined_parallel",
+      "path": "data/corpus/sigerlm_final_dataset.jsonl",
+      "format": "mined_parallel_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI umum dengan kemampuan Bahasa Indonesia, English, dan Lampung Dialek O.",
+      "metadata": {
+        "type": "mined_parallel"
+      }
+    }
+  ]
+}
