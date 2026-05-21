@@ -4,7 +4,7 @@
   "stages": [
     {
       "name": "stage1_foundation",
-      "dataset_registry": "configs/datasets/curriculum_stage1_foundation.json",
+      "dataset_registry": "configs/datasets/curriculum_stage1_foundation_clean.json",
       "training_config": "configs/training/curriculum_stage1_foundation_lora.json"
     },
     {

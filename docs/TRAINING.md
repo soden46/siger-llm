@@ -125,9 +125,11 @@ Before supervised instruction training, audit noisy corpora:
 ```bash
 python tools/audit_instruction_corpus.py data/corpus/lampung_instruction_train.jsonl --report logs/audit_lampung_instruction.json
 python tools/audit_instruction_corpus.py data/corpus/curriculum_stage1_foundation_train.jsonl --report logs/audit_curriculum_stage1.json
+python tools/build_instruction_corpus.py --registry configs/datasets/curriculum_stage1_foundation_clean.json
+python tools/audit_instruction_corpus.py data/corpus/curriculum_stage1_foundation_clean_train.jsonl --report logs/audit_curriculum_stage1_clean.json
 ```
 
-The audit catches likely Batak/Toba contamination in Lampung rows, translation instruction mismatches, and web/search-result artifacts. Rows flagged by this tool should be reviewed by source/type and either corrected, removed from supervised instruction data, or moved to plain pretraining text.
+The audit catches likely Batak/Toba contamination in Lampung rows, translation instruction mismatches, and web/search-result artifacts. Rows flagged by this tool should be reviewed by source/type and either corrected, removed from supervised instruction data, or moved to plain pretraining text. The clean stage-1 registry keeps the safer foundation sources and filters known noisy translation rows before LoRA curriculum use.
 
 ## Automatic LoRA Curriculum
 

@@ -21,7 +21,7 @@
   "resource_target_fraction": 0.8,
   "sharded_checkpoint": false,
   "elastic_recovery": true,
-  "dataset_path": "data/corpus/curriculum_stage1_foundation_train.jsonl",
+  "dataset_path": "data/corpus/curriculum_stage1_foundation_clean_train.jsonl",
   "dataset_name": null,
   "dataset_split": "train",
   "max_samples": null,

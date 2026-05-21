@@ -357,6 +357,15 @@ python tools/audit_instruction_corpus.py data/corpus/curriculum_stage1_foundatio
 
 The audit flags likely Lampung rows contaminated by Batak/Toba markers, translation instruction mismatches, web/search-result artifacts, and malformed JSON rows. Treat this as a triage report: clean or move noisy rows to pretraining text before using them as supervised instruction data.
 
+Build the clean stage-1 foundation corpus:
+
+```bash
+python tools/build_instruction_corpus.py --registry configs/datasets/curriculum_stage1_foundation_clean.json
+python tools/audit_instruction_corpus.py data/corpus/curriculum_stage1_foundation_clean_train.jsonl --report logs/audit_curriculum_stage1_clean.json
+```
+
+`curriculum_stage1_foundation_clean.json` excludes the noisy Cendol mixed translation source and filters `corpus_indonesia_translation` rows from the Indonesian corpus source while keeping the cleaner Indonesian, English, Kaggle hoax classification, Lampung train, and Lampung dictionary rows.
+
 Pantau disk Kaggle sebelum mining besar:
 
 ```bash

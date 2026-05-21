@@ -5,7 +5,7 @@
   "sources": [
     {
       "name": "stage1_foundation",
-      "path": "data/corpus/curriculum_stage1_foundation_train.jsonl",
+      "path": "data/corpus/curriculum_stage1_foundation_clean_train.jsonl",
       "format": "instruction_jsonl",
       "weight": 1,
       "system_prompt": "Kamu adalah SigerLM, asisten AI umum yang cerdas, ringkas, dan akurat.",

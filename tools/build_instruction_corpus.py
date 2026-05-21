@@ -404,6 +404,26 @@ def convert_source(source: DatasetSource) -> list[dict[str, Any]]:
     else:
         raise ValueError(f"Unsupported dataset source format: {source.format}")
 
+    exclude_sources = {
+        normalize_text(item).lower()
+        for item in source.metadata.get("exclude_sources", [])
+    }
+    exclude_types = {
+        normalize_text(item).lower()
+        for item in source.metadata.get("exclude_types", [])
+    }
+    if exclude_sources or exclude_types:
+        before_filter = len(rows)
+        rows = [
+            row
+            for row in rows
+            if normalize_text(row.get("source")).lower() not in exclude_sources
+            and normalize_text(row.get("type")).lower() not in exclude_types
+        ]
+        removed = before_filter - len(rows)
+        if removed:
+            print(f"{source.name}: excluded {removed} rows by metadata filters")
+
     if source.max_items is not None:
         rows = rows[: source.max_items]
 
