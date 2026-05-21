@@ -140,6 +140,15 @@ python train_pipeline.py --mode lora-curriculum
 
 Use `--dry-run` to preview commands, `--no-rebuild-corpora` to reuse existing corpora, and `--force-curriculum` to rerun stages whose merged outputs already exist.
 
+Automatic Dense -> MoE -> LoRA:
+
+```powershell
+python train_pipeline.py --mode auto --dry-run
+python train_pipeline.py --mode auto --dense-profile moe_dense_base --moe-profile small_moe
+```
+
+Dense -> MoE warm-start requires matching base tensor shapes. The safe default is `moe_dense_base` (`d_model=384`, `n_layers=10`) -> `small_moe`. Do not use `siger_medium` as the dense stage for `small_moe`, because `siger_medium` is `d_model=512`, `n_layers=12` and will not load into `small_moe`.
+
 Default `python lora\run_lora.py` remains a Lampung-safe default for backward compatibility.
 
 ## Current Verified Results

@@ -571,7 +571,15 @@ $env:SIGER_MODEL_PROFILE="small_moe"
 python main.py
 ```
 
-Profile default `small` tetap dense dan kompatibel dengan checkpoint lama. `small_moe` menambahkan sparse feed-forward experts pada sebagian layer (`8 experts`, `top_k=2`) dengan auxiliary load-balance loss kecil. Gunakan ini sebagai eksperimen kedua setelah dense baseline sehat.
+Profile default `small` tetap dense dan kompatibel dengan checkpoint lama. `small_moe` menambahkan sparse feed-forward experts pada sebagian layer (`8 experts`, `top_k=2`) dengan auxiliary load-balance loss kecil. Untuk jalur Dense -> MoE otomatis, pretrain dense dengan `moe_dense_base` terlebih dahulu karena shape-nya cocok dengan `small_moe`:
+
+```powershell
+$env:SIGER_MODEL_PROFILE="moe_dense_base"
+$env:SIGER_CHECKPOINT_DIR="checkpoints/auto/dense_moe_base"
+python main.py
+```
+
+Jangan warm-start `small_moe` dari checkpoint `siger_medium` tanpa converter khusus, karena `siger_medium` memakai `d_model=512`, `n_layers=12`, sedangkan `small_moe` memakai `d_model=384`, `n_layers=10`.
 
 Contoh inspeksi cepat:
 

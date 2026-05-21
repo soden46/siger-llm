@@ -134,6 +134,15 @@ python lora\run_lora.py --config configs\training\general_lora.json
 python train_pipeline.py --mode lora-curriculum
 ```
 
+Automatic Dense -> MoE -> LoRA pipeline:
+
+```powershell
+python train_pipeline.py --mode auto --dry-run
+python train_pipeline.py --mode auto --dense-profile moe_dense_base --moe-profile small_moe
+```
+
+The default auto pipeline uses `moe_dense_base` (`d_model=384`, `n_layers=10`) before `small_moe` so Dense -> MoE warm-start has compatible tensor shapes. Do not swap in `siger_medium` for the dense stage unless the MoE profile is also changed to the same base shape.
+
 Preview automatic LoRA curriculum without training:
 
 ```powershell

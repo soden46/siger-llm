@@ -301,7 +301,16 @@ Longer-context dense smoke path:
 ```txt
 SIGER_MODEL_PROFILE="small_context"
 -> use_moe=False
--> d_model=256, n_layers=8, max_seq_len=256
+-> d_model=512, n_layers=12, max_seq_len=512
+```
+
+MoE-compatible dense upcycling base:
+
+```txt
+SIGER_MODEL_PROFILE="moe_dense_base"
+-> use_moe=False
+-> d_model=384, n_layers=10, max_seq_len=512
+-> intended dense checkpoint for warm-starting small_moe
 ```
 
 MoE experiment path:
@@ -309,11 +318,14 @@ MoE experiment path:
 ```txt
 SIGER_MODEL_PROFILE="small_moe"
 -> use_moe=True
+-> d_model=384, n_layers=10, max_seq_len=512
 -> adaptive resolver chooses moe_num_experts / moe_top_k / moe_layers_every
 -> moe_aux_loss_weight=0.01
 ```
 
 The static fallback profile starts from `8 experts`, `top_k=2`, and `moe_layers_every=2`, but `main.py` and `train_pipeline.py` now pass MoE settings through `optimization/moe_sizing.py` unless adaptive sizing is explicitly disabled. This lets the same codebase avoid overbuilding experts on a small CPU/VPS while allowing larger CUDA runs to activate more expert capacity.
+
+Dense -> MoE warm-start requires matching base tensor shapes. The automatic pipeline defaults to `moe_dense_base -> small_moe` and validates `d_model` and `n_layers` before training. A `siger_medium` (`512x12`) checkpoint cannot be warm-started into `small_moe` (`384x10`) without a dedicated conversion path.
 
 The MoE branch is still domain-neutral. It must not contain hard-coded Lampung, Laravel, or routing logic. Any specialization should emerge from data and adapter training, while explicit domain behavior remains in `retrieval/` and `inference/`.
 
@@ -437,15 +449,15 @@ This is different from per-token routing. `SparseMoE` still dynamically routes e
 The automatic training flow is:
 
 ```txt
-Dense SSM stage
+Dense SSM stage (moe_dense_base)
   -> gate: step/loss threshold
   -> Adaptive MoE resolver: hardware + dense loss
-  -> MoE expansion stage
+  -> MoE expansion stage (small_moe)
   -> gate: plateau / loss delta
   -> LoRA specialization
 ```
 
-Because SigerLM blocks do not contain a standalone dense FFN, Dense -> MoE warm-start copies compatible embedding, SSM, norm, and projection weights, then initializes new expert tensors as additional capacity. It does not fabricate an FFN-to-expert copy that does not exist in the architecture.
+Because SigerLM blocks do not contain a standalone dense FFN, Dense -> MoE warm-start copies compatible embedding, SSM, norm, and projection weights, then initializes new expert tensors as additional capacity. It does not fabricate an FFN-to-expert copy that does not exist in the architecture. Checkpoints for the default dense auto stage live in `checkpoints/auto/dense_moe_base`; MoE checkpoints live in `checkpoints/auto/moe`.
 
 ## 8. SSM Core: Selective State Space
 

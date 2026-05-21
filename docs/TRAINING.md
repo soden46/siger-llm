@@ -55,12 +55,14 @@ python main.py
 
 The `small_moe` profile keeps the same general SSM/Mamba-like core but adds sparse experts on selected blocks. It increases capacity without making Lampung, Laravel, or any domain rule part of the core model.
 
+For Dense -> MoE upcycling, the dense checkpoint must match the MoE profile's base tensor shape. Use `moe_dense_base` before `small_moe`; both use `d_model=384`, `n_layers=10`, and `max_seq_len=512`.
+
 ## Adaptive Training Pipeline
 
 `train_pipeline.py` can run the dense -> MoE -> LoRA flow automatically with metric gates:
 
 ```powershell
-python train_pipeline.py --lora-config configs\training\general_lora.json
+python train_pipeline.py --mode auto --lora-config configs\training\general_lora.json
 ```
 
 Default gates:
@@ -70,7 +72,13 @@ dense -> MoE: step >= 1500 and loss <= 3.5
 MoE -> LoRA: latest checkpoint loss delta <= 0.005
 ```
 
-The dense stage writes checkpoints to `checkpoints/auto/dense`. When the dense gate passes, the MoE stage is warm-started from the dense checkpoint with shared SSM/tokenizer weights loaded and new MoE tensors initialized as additional capacity. The dense SigerLM block has no standalone dense FFN to clone into experts, so the transition intentionally copies compatible SSM weights instead of pretending an FFN copy exists.
+The default dense stage uses `moe_dense_base` and writes checkpoints to `checkpoints/auto/dense_moe_base`. When the dense gate passes, the MoE stage uses `small_moe` and is warm-started from the dense checkpoint with shared SSM/tokenizer weights loaded and new MoE tensors initialized as additional capacity. The dense SigerLM block has no standalone dense FFN to clone into experts, so the transition intentionally copies compatible SSM weights instead of pretending an FFN copy exists.
+
+`train_pipeline.py` validates Dense -> MoE profile compatibility before training. If `d_model` or `n_layers` differ, the run fails early with a clear profile mismatch error. Override the pair only when the shapes are intentionally compatible:
+
+```powershell
+python train_pipeline.py --mode auto --dense-profile moe_dense_base --moe-profile small_moe
+```
 
 The MoE stage writes checkpoints to `checkpoints/auto/moe`. Before that stage starts, `optimization/moe_sizing.py` chooses `moe_num_experts`, `moe_top_k`, and `moe_layers_every` from the current hardware profile and the latest dense loss. This keeps CPU/VPS runs conservative while giving stronger CUDA runs more expert capacity. When the plateau gate passes, LoRA is trained from the latest MoE checkpoint and merged according to the selected LoRA config.
 
@@ -96,6 +104,21 @@ python train_pipeline.py --dense-loss-threshold 4.0 --dense-min-steps 1000
 python train_pipeline.py --moe-plateau-delta 0.01 --lora-config configs\training\lampung_lora.json
 python train_pipeline.py --force-stage lora --lora-config configs\training\general_lora.json
 ```
+
+Kaggle staged base training:
+
+```bash
+# Small CPU-safe run when GPU quota is unavailable.
+SIGER_TEXT_SOURCES=data/corpus/base_pretrain_text.txt SIGER_MODEL_PROFILE=small SIGER_RESUME=1 SIGER_SAVE_EVERY=50 SIGER_MAX_STEPS=1000 SIGER_DEVICE=cpu python main.py
+
+# Dense base compatible with the MoE stage.
+SIGER_TEXT_SOURCES=data/corpus/base_pretrain_text.txt SIGER_MODEL_PROFILE=moe_dense_base SIGER_CHECKPOINT_DIR=checkpoints/auto/dense_moe_base SIGER_RESUME=1 SIGER_SAVE_EVERY=100 SIGER_MAX_STEPS=3000 SIGER_DEVICE=auto SIGER_PRECISION=auto PYTORCH_ALLOC_CONF=expandable_segments:True python main.py
+
+# Full gated auto pipeline.
+SIGER_TEXT_SOURCES=data/corpus/base_pretrain_text.txt PYTORCH_ALLOC_CONF=expandable_segments:True python train_pipeline.py --mode auto --dense-profile moe_dense_base --moe-profile small_moe --dense-max-steps 3000 --moe-max-steps 5000
+```
+
+`SIGER_MAX_STEPS` is the total target optimizer step, not "additional steps". Resume is dynamic: if `latest.json` is stale, the loader falls back to the newest `step_*.pt`; if no checkpoint exists, training starts fresh.
 
 ## Automatic LoRA Curriculum
 

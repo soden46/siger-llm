@@ -345,10 +345,22 @@ Curriculum stage4 full: 218596 rows
 Adaptive Dense -> MoE -> LoRA pipeline:
 
 ```powershell
-python train_pipeline.py --lora-config configs\training\general_lora.json
+python train_pipeline.py --mode auto --lora-config configs\training\general_lora.json
 ```
 
-The pipeline starts from the dense SSM baseline, expands to Sparse MoE only after the dense checkpoint passes the configured loss/step gate, then trains LoRA after the MoE curve plateaus. During the MoE expansion stage, SigerLM chooses a conservative expert layout from the current hardware and the latest dense loss, so small CPU/VPS runs get fewer active experts while stronger CUDA runs can use more capacity.
+The pipeline starts from the shape-compatible dense SSM profile `moe_dense_base` (`d_model=384`, `n_layers=10`), expands to `small_moe` only after the dense checkpoint passes the configured loss/step gate, then trains LoRA after the MoE curve plateaus. Dense -> MoE warm-start requires matching base tensor shapes; `train_pipeline.py` validates `d_model` and `n_layers` before training so incompatible profile pairs fail early instead of crashing at checkpoint load time.
+
+During the MoE expansion stage, SigerLM chooses a conservative expert layout from the current hardware and the latest dense loss, so small CPU/VPS runs get fewer active experts while stronger CUDA runs can use more capacity. Dense auto-pipeline checkpoints are written to `checkpoints/auto/dense_moe_base`, while MoE checkpoints are written to `checkpoints/auto/moe`.
+
+Kaggle staged base training examples:
+
+```bash
+SIGER_TEXT_SOURCES=data/corpus/base_pretrain_text.txt SIGER_MODEL_PROFILE=small SIGER_RESUME=1 SIGER_SAVE_EVERY=50 SIGER_MAX_STEPS=1000 SIGER_DEVICE=cpu python main.py
+SIGER_TEXT_SOURCES=data/corpus/base_pretrain_text.txt SIGER_MODEL_PROFILE=moe_dense_base SIGER_CHECKPOINT_DIR=checkpoints/auto/dense_moe_base SIGER_RESUME=1 SIGER_SAVE_EVERY=100 SIGER_MAX_STEPS=3000 SIGER_DEVICE=auto SIGER_PRECISION=auto PYTORCH_ALLOC_CONF=expandable_segments:True python main.py
+PYTORCH_ALLOC_CONF=expandable_segments:True SIGER_TEXT_SOURCES=data/corpus/base_pretrain_text.txt python train_pipeline.py --mode auto --dense-profile moe_dense_base --moe-profile small_moe --dense-max-steps 3000 --moe-max-steps 5000
+```
+
+`main.py` resumes by default when `SIGER_RESUME=1`. If `latest.json` points at a missing checkpoint, the checkpoint loader falls back to the newest `step_*.pt`; if no checkpoint exists yet, it starts fresh.
 
 Automatic easy-to-hard LoRA curriculum:
 

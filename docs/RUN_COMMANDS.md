@@ -82,16 +82,18 @@ Pilih kapasitas model base yang lebih kuat untuk reasoning jika VRAM/waktu cukup
 
 ```bash
 SIGER_MODEL_PROFILE=small_context python main.py
+SIGER_MODEL_PROFILE=moe_dense_base python main.py
 SIGER_MODEL_PROFILE=base python main.py
 SIGER_MODEL_PROFILE=reasoning_base python main.py
 ```
 
-Profile default tetap `small` (`d_model=256`, `n_layers=8`, `max_seq_len=128`) agar smoke test Kaggle lebih aman. Profile `small_context` mempertahankan ukuran 11.8M tetapi menaikkan context training ke `max_seq_len=256`. Profile `base` memakai `d_model=512`, `n_layers=12`; profile `reasoning_base` menaikkan context training ke `max_seq_len=512`.
+Profile default tetap `small` (`d_model=256`, `n_layers=8`, `max_seq_len=128`) agar smoke test Kaggle lebih aman. Profile `moe_dense_base` (`d_model=384`, `n_layers=10`, `max_seq_len=512`) adalah dense base yang shape-compatible dengan `small_moe` untuk upcycling Dense -> MoE. Profile `base` memakai `d_model=512`, `n_layers=12`; profile `reasoning_base` menaikkan context training ke `max_seq_len=512`.
 
 Adaptive dense -> MoE -> LoRA pipeline:
 
 ```powershell
-python train_pipeline.py --lora-config configs\training\general_lora.json
+python train_pipeline.py --mode auto --lora-config configs\training\general_lora.json
+python train_pipeline.py --mode auto --dense-profile moe_dense_base --moe-profile small_moe
 ```
 
 Automatic easy-to-hard LoRA curriculum:
@@ -109,15 +111,33 @@ PYTORCH_ALLOC_CONF=expandable_segments:True python train_pipeline.py --mode lora
 Preview without training:
 
 ```powershell
+python train_pipeline.py --mode auto --dry-run
 python train_pipeline.py --mode lora-curriculum --dry-run
 ```
 
 Default trigger:
 
 ```txt
+dense profile: moe_dense_base
+MoE profile  : small_moe
 dense -> MoE: step >= 1500 and loss <= 3.5
 MoE -> LoRA: latest checkpoint loss delta <= 0.005
 ```
+
+Kaggle staged small -> medium -> high:
+
+```bash
+# 1) Small CPU-safe base training.
+SIGER_TEXT_SOURCES=data/corpus/base_pretrain_text.txt SIGER_MODEL_PROFILE=small SIGER_RESUME=1 SIGER_SAVE_EVERY=50 SIGER_MAX_STEPS=1000 SIGER_DEVICE=cpu python main.py
+
+# 2) Medium dense base compatible with small_moe.
+SIGER_TEXT_SOURCES=data/corpus/base_pretrain_text.txt SIGER_MODEL_PROFILE=moe_dense_base SIGER_CHECKPOINT_DIR=checkpoints/auto/dense_moe_base SIGER_RESUME=1 SIGER_SAVE_EVERY=100 SIGER_MAX_STEPS=3000 SIGER_DEVICE=auto SIGER_PRECISION=auto PYTORCH_ALLOC_CONF=expandable_segments:True python main.py
+
+# 3) High/capacity path: gated Dense -> MoE -> LoRA.
+SIGER_TEXT_SOURCES=data/corpus/base_pretrain_text.txt PYTORCH_ALLOC_CONF=expandable_segments:True python train_pipeline.py --mode auto --dense-profile moe_dense_base --moe-profile small_moe --dense-max-steps 3000 --moe-max-steps 5000
+```
+
+`SIGER_RESUME=1` resumes if possible. If `latest.json` points at a missing checkpoint, the loader falls back to the newest `step_*.pt`; if no checkpoint exists, it starts a new run.
 
 Lampung adapter pipeline:
 
