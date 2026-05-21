@@ -129,11 +129,48 @@ TRAIN_CONFIG = {
     "prefetch_factor": 2,
 }
 
+
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() not in {"0", "false", "no", "off"}
+
+
+def _apply_env_overrides(config: dict) -> None:
+    """Notebook/Kaggle-friendly overrides without editing this file."""
+    int_overrides = {
+        "SIGER_MAX_STEPS": "max_steps",
+        "SIGER_SAVE_EVERY": "save_every",
+        "SIGER_GRAD_ACCUM_STEPS": "grad_accum_steps",
+        "SIGER_MAX_SEQ_LEN": "max_seq_len",
+    }
+    str_overrides = {
+        "SIGER_CHECKPOINT_DIR": "checkpoint_dir",
+        "SIGER_DEVICE": "device",
+        "SIGER_PRECISION": "precision",
+    }
+
+    for env_name, config_key in int_overrides.items():
+        value = os.environ.get(env_name)
+        if value:
+            old = config.get(config_key)
+            config[config_key] = int(value)
+            print(f"Env override {config_key}: {old} -> {config[config_key]}")
+
+    for env_name, config_key in str_overrides.items():
+        value = os.environ.get(env_name)
+        if value:
+            old = config.get(config_key)
+            config[config_key] = value
+            print(f"Env override {config_key}: {old} -> {config[config_key]}")
+
 def main():
     profile_name = os.environ.get("SIGER_MODEL_PROFILE", TRAIN_CONFIG.get("model_profile", "small")).lower()
     if profile_name not in MODEL_PROFILES:
         raise ValueError(f"Unknown SIGER_MODEL_PROFILE={profile_name}. Choose: {', '.join(MODEL_PROFILES)}")
     TRAIN_CONFIG.update(MODEL_PROFILES[profile_name])
+    _apply_env_overrides(TRAIN_CONFIG)
     print(f"Model profile: {profile_name}")
 
     maybe_relaunch_with_torchrun(
@@ -232,7 +269,9 @@ def main():
 
     # 4. Trainer
     trainer = Trainer(model, TRAIN_CONFIG)
-    trainer.train(dataset, resume=False)
+    resume = _env_bool("SIGER_RESUME", True)
+    print(f"Resume checkpoints: {resume}")
+    trainer.train(dataset, resume=resume)
 
 if __name__ == "__main__":
     main()
