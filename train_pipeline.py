@@ -34,13 +34,15 @@ from training.trainer import Trainer
 @dataclass
 class PipelineConfig:
     mode: str = "auto"
+    dense_profile: str = "moe_dense_base"
+    moe_profile: str = "small_moe"
     dense_loss_threshold: float = 3.5
     dense_min_steps: int = 1500
     dense_max_steps: int = 3000
     moe_max_steps: int = 5000
     moe_plateau_delta: float = 0.005
     moe_min_checkpoints: int = 2
-    dense_checkpoint_dir: str = "./checkpoints/auto/dense"
+    dense_checkpoint_dir: str = "./checkpoints/auto/dense_moe_base"
     moe_checkpoint_dir: str = "./checkpoints/auto/moe"
     state_path: str = "./checkpoints/auto/pipeline_state.json"
     lora_config: str = "./configs/training/general_lora.json"
@@ -64,12 +66,22 @@ def parse_args() -> argparse.Namespace:
         help="auto runs the existing dense->MoE->LoRA pipeline; lora-curriculum runs LoRA stages easy-to-hard.",
     )
     parser.add_argument("--dense-loss-threshold", type=float, default=3.5)
+    parser.add_argument(
+        "--dense-profile",
+        default="moe_dense_base",
+        help="Dense base profile used before MoE upcycling. Must match MoE d_model/n_layers.",
+    )
+    parser.add_argument(
+        "--moe-profile",
+        default="small_moe",
+        help="MoE profile used after dense pre-training.",
+    )
     parser.add_argument("--dense-min-steps", type=int, default=1500)
     parser.add_argument("--dense-max-steps", type=int, default=3000)
     parser.add_argument("--moe-max-steps", type=int, default=5000)
     parser.add_argument("--moe-plateau-delta", type=float, default=0.005)
     parser.add_argument("--moe-min-checkpoints", type=int, default=2)
-    parser.add_argument("--dense-checkpoint-dir", default="./checkpoints/auto/dense")
+    parser.add_argument("--dense-checkpoint-dir", default="./checkpoints/auto/dense_moe_base")
     parser.add_argument("--moe-checkpoint-dir", default="./checkpoints/auto/moe")
     parser.add_argument("--state-path", default="./checkpoints/auto/pipeline_state.json")
     parser.add_argument("--lora-config", default="./configs/training/general_lora.json")
@@ -109,10 +121,37 @@ def load_latest_meta(checkpoint_dir: str | Path) -> dict[str, Any] | None:
 
 def latest_checkpoint_path(checkpoint_dir: str | Path) -> Path | None:
     meta = load_latest_meta(checkpoint_dir)
-    if not meta:
-        return None
-    path = Path(checkpoint_dir) / str(meta["latest"])
-    return path if path.exists() else None
+    directory = Path(checkpoint_dir)
+    if meta:
+        path = directory / str(meta["latest"])
+        if path.exists():
+            return path
+        print(f"Latest checkpoint metadata is stale: {path} not found.")
+
+    candidates = sorted(directory.glob("step_*.pt"))
+    return candidates[-1] if candidates else None
+
+
+def validate_upcycle_profiles(dense_profile: str, moe_profile: str) -> None:
+    if dense_profile not in MODEL_PROFILES:
+        raise ValueError(f"Unknown dense profile: {dense_profile}")
+    if moe_profile not in MODEL_PROFILES:
+        raise ValueError(f"Unknown MoE profile: {moe_profile}")
+
+    dense = MODEL_PROFILES[dense_profile]
+    moe = MODEL_PROFILES[moe_profile]
+    keys = ("d_model", "n_layers")
+    mismatches = [
+        f"{key}: dense={dense.get(key)}, moe={moe.get(key)}"
+        for key in keys
+        if dense.get(key) != moe.get(key)
+    ]
+    if mismatches:
+        raise ValueError(
+            "Dense -> MoE warm-start needs matching base tensor shapes. "
+            "Use matching profiles or override --dense-profile/--moe-profile. "
+            f"Mismatches: {', '.join(mismatches)}"
+        )
 
 
 def write_state(config: PipelineConfig, stage: str, status: str, **extra: Any) -> None:
@@ -577,6 +616,8 @@ def main() -> None:
         run_lora_curriculum(config)
         return
 
+    validate_upcycle_profiles(config.dense_profile, config.moe_profile)
+
     maybe_relaunch_with_torchrun(
         script_path=Path(__file__).resolve(),
         argv=sys.argv[1:],
@@ -591,7 +632,7 @@ def main() -> None:
     if config.force_stage in {None, "dense"} and not is_dense_ready(config, dense_meta):
         write_state(config, "dense", "running", latest=dense_meta)
         dense_meta = run_base_stage(
-            profile_name="siger_medium",
+            profile_name=config.dense_profile,
             max_steps=config.dense_max_steps,
             checkpoint_dir=config.dense_checkpoint_dir,
             resume=True,
@@ -617,7 +658,7 @@ def main() -> None:
     if config.force_stage in {None, "moe"} and not is_moe_plateau(config):
         write_state(config, "moe", "running", latest=moe_meta)
         moe_meta = run_base_stage(
-            profile_name="small_moe",
+            profile_name=config.moe_profile,
             max_steps=config.moe_max_steps,
             checkpoint_dir=config.moe_checkpoint_dir,
             resume=(moe_meta is not None),

@@ -31,6 +31,9 @@ MODEL_PROFILES = {
         "moe_layers_every": 2,
         "moe_aux_loss_weight": 0.01,
     },
+
+    # Dense base yang shape-compatible dengan small_moe untuk upcycling Dense -> MoE.
+    "moe_dense_base": {"d_model": 384, "n_layers": 10, "max_seq_len": 512},
     
     # JALUR 2: TAMBAHKAN PROFIL DENSE BARU (~75M - 85M Parameter murni)
     "siger_medium": {
