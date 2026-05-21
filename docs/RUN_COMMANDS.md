@@ -36,6 +36,7 @@ python -m py_compile chat_cli.py inference\router.py inference\lampung_pipeline.
 python -m py_compile training\dataset_registry.py tools\build_instruction_corpus.py lora\config.py lora\dataset.py lora\run_lora.py train_pipeline.py
 python -m py_compile tools\mine_general_assistant_data.py
 python -m py_compile tools\mine_indonesian_hf_mix.py
+python -m py_compile evaluation\run_harness.py evaluation\harness\checks.py evaluation\harness\runner.py
 ```
 
 ## 3. Model Forward Smoke
@@ -50,6 +51,20 @@ python -c "import torch; from config.model_config import SigerConfig; from model
 
 ```powershell
 python main.py
+```
+
+## 4a. Engineering Harness Smoke
+
+Dataset-only harness check:
+
+```powershell
+python evaluation\run_harness.py --config configs\evaluation\harness_smoke.json --only dataset_fixture_audit
+```
+
+Checkpoint-backed harness check:
+
+```powershell
+python evaluation\run_harness.py --config configs\evaluation\harness_smoke.json --checkpoint checkpoints\lora\model_general_merged.pt --device auto
 ```
 
 Jika runtime punya lebih dari satu GPU CUDA, `main.py` otomatis re-launch lewat `torchrun` dan memakai DDP.

@@ -17,6 +17,52 @@ evaluation/run_eval.py
 
 These are intended for perplexity, generation quality, Indo tasks, and benchmark wrappers. Some parts are still scaffolding and should be verified before being treated as final metrics.
 
+## Engineering Harness
+
+The engineering harness is a config-driven layer around existing inference and evaluation pieces. It does not change the model core. It can audit datasets without loading a model, or load one checkpoint and run generation/router/Lampung regression suites.
+
+Files:
+
+```txt
+evaluation/harness/
+evaluation/run_harness.py
+configs/evaluation/harness_smoke.json
+configs/evaluation/harness_dataset_only.json
+data/eval/harness/*.jsonl
+```
+
+Dataset-only audit:
+
+```powershell
+python evaluation\run_harness.py --config configs\evaluation\harness_smoke.json --only dataset_fixture_audit
+```
+
+Checkpoint-backed smoke:
+
+```powershell
+python evaluation\run_harness.py --config configs\evaluation\harness_smoke.json --checkpoint checkpoints\lora\model_general_merged.pt --device auto
+```
+
+For Kaggle/code-corpus work, point `configs/evaluation/harness_dataset_only.json` at the generated JSONL corpus or raw converted source JSONL, then run:
+
+```powershell
+python evaluation\run_harness.py --config configs\evaluation\harness_dataset_only.json --no-fail
+```
+
+Each run writes:
+
+```txt
+logs/eval/harness/<timestamp>_<name>/report.json
+logs/eval/harness/<timestamp>_<name>/summary.md
+```
+
+Supported suite kinds:
+
+- `dataset_audit`: JSONL validity, required fields, rough length, duplicate fingerprints, optional metadata license check.
+- `generation`: direct `Generator.generate(...)` smoke cases.
+- `router`: `SigerRouter` route and output regression cases.
+- `lampung_lookup`: lookup-first Lampung translation regression cases.
+
 ## Lampung Lookup Evaluation
 
 Recent Lampung work added lookup-first eval helpers:

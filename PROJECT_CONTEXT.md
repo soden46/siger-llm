@@ -18,6 +18,7 @@ The system currently supports:
 - Lampung dataset extraction and instruction generation
 - lookup-first Lampung inference
 - general/domain routing in CLI
+- config-driven engineering evaluation harness
 - evaluation and optimization scaffolding
 
 ## Architecture Snapshot
@@ -69,6 +70,8 @@ inference/router.py
 inference/lampung_pipeline.py
 retrieval/instruction_lookup.py
 retrieval/compositional_translator.py
+evaluation/run_harness.py
+evaluation/harness/runner.py
 ```
 
 ## Config Files
@@ -84,6 +87,8 @@ configs/training/lampung_lora.json
 configs/training/general_lora.json
 configs/training/lora_curriculum.json
 configs/training/curriculum_stage*_lora.json
+configs/evaluation/harness_smoke.json
+configs/evaluation/harness_dataset_only.json
 ```
 
 ## Current Dataset State
@@ -155,6 +160,13 @@ Run CLI:
 python chat_cli.py
 ```
 
+Run engineering harness:
+
+```powershell
+python evaluation\run_harness.py --config configs\evaluation\harness_smoke.json --only dataset_fixture_audit
+python evaluation\run_harness.py --config configs\evaluation\harness_smoke.json --checkpoint checkpoints\lora\model_general_merged.pt
+```
+
 CLI modes:
 
 ```txt
@@ -183,5 +195,5 @@ Source: exact instruction lookup
 2. Keep Lampung domain as an adapter, not the whole architecture.
 3. Train/evaluate the easy-to-hard LoRA curriculum once base checkpoint/tokenizer are aligned.
 4. Add small automated tests for corpus builder, router, and lookup.
-5. Improve evaluation coverage for Lampung ID/EN and general chat.
+5. Improve evaluation coverage for Lampung ID/EN, general chat, and code generation through the harness.
 6. Keep CPU/VPS memory use under control.

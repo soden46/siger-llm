@@ -57,6 +57,7 @@ Kalau kamu tertarik dengan low-resource language AI, infrastruktur AI Indonesia,
 - Anti-collapse MoE routing: load-balance loss, router importance penalty, jitter eksplorasi, dan metrik `moe_dead`
 - Unified instruction corpus builder berbasis dataset registry
 - Inference generator, chat session, router, dan Lampung domain pipeline
+- Engineering evaluation harness untuk dataset audit, checkpoint smoke, router regression, dan Lampung lookup regression
 - Retrieval/rule layer untuk Lampung lookup dan compositional translation
 - Dataset pipeline Lampung O/Nyo -> Indonesia -> English
 - PDF extraction tools untuk kamus, paper SMT, dan dataset percakapan

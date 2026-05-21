@@ -6,6 +6,7 @@ from .indo_eval    import IndoEvaluator
 from .lampung_eval import LampungEvaluator, run_lampung_eval
 from .runner       import EvaluationRunner
 from .report       import EvalReport
+from .harness      import HarnessRunner, run_harness
 
 __all__ = [
     "PerplexityEvaluator",
@@ -16,4 +17,6 @@ __all__ = [
     "run_lampung_eval",
     "EvaluationRunner",
     "EvalReport",
+    "HarnessRunner",
+    "run_harness",
 ]

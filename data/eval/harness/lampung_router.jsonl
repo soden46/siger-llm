@@ -1,0 +1,3 @@
+{"id":"lo_id_exact","prompt":"Nyak haga mengan manuk di warung paghek jalan","expected_route":"lampung_to_id","expected_contains":["aku","makan"],"min_chars":5}
+{"id":"lo_en_request","prompt":"Translate to English: Nyak haga mengan manuk di warung paghek jalan","expected_route":"lampung_to_en","min_chars":5}
+{"id":"general_chat","prompt":"Jelaskan apa itu unit test secara ringkas.","expected_route":"general_chat","min_chars":20,"expected_not_contains":["<|user|>","<|assistant|>"]}

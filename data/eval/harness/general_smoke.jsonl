@@ -1,0 +1,3 @@
+{"id":"rest_api_short","prompt":"Jelaskan apa itu REST API secara ringkas.","min_chars":20,"expected_not_contains":["<|user|>","<|assistant|>"],"max_repetition_ratio":0.85}
+{"id":"python_function","prompt":"Buat fungsi Python sederhana untuk menghitung luas persegi panjang.","min_chars":20,"expected_contains":["def"],"expected_not_contains":["<|user|>","<|assistant|>"],"max_repetition_ratio":0.85}
+{"id":"uncertainty","prompt":"Kalau informasi belum pasti, apa yang sebaiknya dilakukan model?","min_chars":20,"expected_not_contains":["<|user|>","<|assistant|>"],"max_repetition_ratio":0.85}

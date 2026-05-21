@@ -1,0 +1,16 @@
+{
+  "name": "siger_dataset_harness",
+  "output_dir": "logs/eval/harness",
+  "suites": [
+    {
+      "name": "code_training_corpus_audit",
+      "kind": "dataset_audit",
+      "path": "data/corpus/code_instruction_safe_train.jsonl",
+      "metadata_path": "data/raw/code/apache_2_0/codefeedback_filtered_instruction/metadata.json",
+      "required_fields": ["instruction", "output"],
+      "allowed_licenses": ["MIT", "Apache-2.0"],
+      "max_row_tokens": 1024,
+      "max_rows": 20000
+    }
+  ]
+}

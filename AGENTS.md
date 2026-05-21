@@ -68,6 +68,7 @@ inference/router.py                    general vs domain router
 inference/lampung_pipeline.py          Lampung lookup-first pipeline
 retrieval/instruction_lookup.py        exact and bag-of-words lookup
 retrieval/compositional_translator.py  rule composer ID/LO/EN
+evaluation/run_harness.py              config-driven engineering eval harness
 chat_cli.py                            local CLI smoke tests
 modalities/base.py                     kontrak adapter modality -> sequence embedding
 modalities/registry.py                 daftar capability modality dan objective
@@ -198,7 +199,14 @@ Run relevant compile checks after edits:
 ```powershell
 python -m py_compile chat_cli.py inference\router.py inference\lampung_pipeline.py retrieval\instruction_lookup.py retrieval\compositional_translator.py
 python -m py_compile training\dataset_registry.py tools\build_instruction_corpus.py lora\config.py lora\dataset.py lora\run_lora.py train_pipeline.py
+python -m py_compile evaluation\run_harness.py evaluation\harness\checks.py evaluation\harness\runner.py
 python train_pipeline.py --mode lora-curriculum --dry-run
+```
+
+Harness smoke:
+
+```powershell
+python evaluation\run_harness.py --config configs\evaluation\harness_smoke.json --only dataset_fixture_audit
 ```
 
 CLI smoke:

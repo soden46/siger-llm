@@ -1,0 +1,43 @@
+{
+  "name": "siger_harness_smoke",
+  "output_dir": "logs/eval/harness",
+  "device": "auto",
+  "generation": {
+    "max_new_tokens": 80,
+    "temperature": 0.2,
+    "top_k": 20,
+    "top_p": 0.8
+  },
+  "suites": [
+    {
+      "name": "dataset_fixture_audit",
+      "kind": "dataset_audit",
+      "path": "data/eval/harness/code_fixture.jsonl",
+      "metadata_path": "data/eval/harness/code_fixture.metadata.json",
+      "required_fields": ["instruction", "output"],
+      "allowed_licenses": ["MIT", "Apache-2.0"],
+      "max_row_tokens": 512
+    },
+    {
+      "name": "general_generation_smoke",
+      "kind": "generation",
+      "path": "data/eval/harness/general_smoke.jsonl",
+      "max_cases": 3,
+      "required": true
+    },
+    {
+      "name": "lampung_router_regression",
+      "kind": "router",
+      "path": "data/eval/harness/lampung_router.jsonl",
+      "max_cases": 3,
+      "required": true
+    },
+    {
+      "name": "lampung_lookup_regression",
+      "kind": "lampung_lookup",
+      "path": "data/eval/harness/lampung_lookup.jsonl",
+      "max_cases": 3,
+      "required": true
+    }
+  ]
+}

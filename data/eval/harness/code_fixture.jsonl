@@ -1,0 +1,2 @@
+{"instruction":"Buat fungsi Python untuk menjumlahkan dua angka.","input":"","output":"def add(a, b):\n    return a + b","source":"siger_harness_fixture","type":"code_instruction_fixture"}
+{"instruction":"Jelaskan kegunaan pytest dalam satu kalimat.","input":"","output":"Pytest digunakan untuk menulis dan menjalankan automated test Python secara ringkas.","source":"siger_harness_fixture","type":"code_instruction_fixture"}
