@@ -348,6 +348,15 @@ Quality report dibuat otomatis di samping corpus, misalnya:
 data/corpus/indonesian_hf_mix_plus_kaggle_train.report.json
 ```
 
+Audit instruction corpus noise before training:
+
+```bash
+python tools/audit_instruction_corpus.py data/corpus/lampung_instruction_train.jsonl --report logs/audit_lampung_instruction.json
+python tools/audit_instruction_corpus.py data/corpus/curriculum_stage1_foundation_train.jsonl --report logs/audit_curriculum_stage1.json
+```
+
+The audit flags likely Lampung rows contaminated by Batak/Toba markers, translation instruction mismatches, web/search-result artifacts, and malformed JSON rows. Treat this as a triage report: clean or move noisy rows to pretraining text before using them as supervised instruction data.
+
 Pantau disk Kaggle sebelum mining besar:
 
 ```bash

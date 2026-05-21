@@ -120,6 +120,15 @@ SIGER_TEXT_SOURCES=data/corpus/base_pretrain_text.txt PYTORCH_ALLOC_CONF=expanda
 
 `SIGER_MAX_STEPS` is the total target optimizer step, not "additional steps". Resume is dynamic: if `latest.json` is stale, the loader falls back to the newest `step_*.pt`; if no checkpoint exists, training starts fresh.
 
+Before supervised instruction training, audit noisy corpora:
+
+```bash
+python tools/audit_instruction_corpus.py data/corpus/lampung_instruction_train.jsonl --report logs/audit_lampung_instruction.json
+python tools/audit_instruction_corpus.py data/corpus/curriculum_stage1_foundation_train.jsonl --report logs/audit_curriculum_stage1.json
+```
+
+The audit catches likely Batak/Toba contamination in Lampung rows, translation instruction mismatches, and web/search-result artifacts. Rows flagged by this tool should be reviewed by source/type and either corrected, removed from supervised instruction data, or moved to plain pretraining text.
+
 ## Automatic LoRA Curriculum
 
 For one-command instruction tuning from easier data to harder data:
