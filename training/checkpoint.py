@@ -1,20 +1,21 @@
 # training/checkpoint.py
-import torch
-import os
 import json
-from pathlib import Path
+import os
 from datetime import datetime
+from pathlib import Path
+
+import torch
 
 from optimization.gpu import unwrap_model
 
 
 class CheckpointManager:
     """
-    Save & load model checkpoint.
-    Kayak git commit — tiap N step lo save state.
+    Save and load model checkpoints.
     """
+
     def __init__(self, save_dir: str, keep_last: int = 3):
-        self.save_dir  = Path(save_dir)
+        self.save_dir = Path(save_dir)
         self.keep_last = keep_last
         self.save_dir.mkdir(parents=True, exist_ok=True)
         self.history: list[str] = []
@@ -33,42 +34,48 @@ class CheckpointManager:
         ckpt_path = self.save_dir / ckpt_name
 
         raw_model = unwrap_model(model)
-
         model_name = getattr(getattr(raw_model, "config", None), "model_name", "SIGER")
 
-        torch.save({
-            "step":            step,
-            "loss":            loss,
-            "model_name":      model_name,
-            "model_state":     raw_model.state_dict(),
-            "optimizer_state": optimizer.state_dict(),
-            "scheduler_step":  scheduler.current_step,
-            "config":          config,
-        }, ckpt_path)
+        torch.save(
+            {
+                "step": step,
+                "loss": loss,
+                "model_name": model_name,
+                "model_state": raw_model.state_dict(),
+                "optimizer_state": optimizer.state_dict(),
+                "scheduler_step": scheduler.current_step,
+                "config": config,
+            },
+            ckpt_path,
+        )
 
-        # Simpan metadata
         meta_path = self.save_dir / "latest.json"
         with open(meta_path, "w") as f:
-            json.dump({"latest": ckpt_name, "step": step, "loss": loss, "model_name": model_name}, f)
+            json.dump(
+                {
+                    "latest": ckpt_name,
+                    "step": step,
+                    "loss": loss,
+                    "model_name": model_name,
+                },
+                f,
+            )
 
         self.history.append(str(ckpt_path))
-        print(f"💾 Saved checkpoint: {ckpt_name} | loss={loss:.4f}")
+        print(f"Saved checkpoint: {ckpt_name} | loss={loss:.4f}")
 
-        # Hapus checkpoint lama
         self._cleanup()
-
         return str(ckpt_path)
 
     def load(self, model, optimizer=None, scheduler=None, path: str = None):
-        """Load checkpoint. Kalau path=None, load yang paling baru."""
+        """Load checkpoint. If none exists, start fresh."""
         if path is None:
-            meta_path = self.save_dir / "latest.json"
-            if not meta_path.exists():
-                print("⚠️  No checkpoint found, starting fresh.")
+            path = self._resolve_latest_checkpoint()
+            if path is None:
+                print("No checkpoint found, starting fresh.")
                 return 0, float("inf")
-            with open(meta_path) as f:
-                meta = json.load(f)
-            path = self.save_dir / meta["latest"]
+        else:
+            path = Path(path)
 
         ckpt = torch.load(path, map_location="cpu")
         raw_model = unwrap_model(model)
@@ -92,8 +99,29 @@ class CheckpointManager:
 
         step = ckpt.get("step", 0)
         loss = ckpt.get("loss", float("inf"))
-        print(f"✅ Loaded checkpoint: step={step} | loss={loss:.4f}")
+        print(f"Loaded checkpoint: step={step} | loss={loss:.4f}")
         return step, loss
+
+    def _resolve_latest_checkpoint(self) -> Path | None:
+        meta_path = self.save_dir / "latest.json"
+        if meta_path.exists():
+            try:
+                with open(meta_path) as f:
+                    meta = json.load(f)
+                latest = self.save_dir / meta["latest"]
+                if latest.exists():
+                    return latest
+                print(f"Latest checkpoint metadata is stale: {latest} not found.")
+            except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
+                print(f"Cannot read latest checkpoint metadata: {exc}")
+
+        candidates = sorted(self.save_dir.glob("step_*.pt"))
+        if not candidates:
+            return None
+
+        fallback = candidates[-1]
+        print(f"Falling back to latest checkpoint file: {fallback.name}")
+        return fallback
 
     def _cleanup(self):
         if len(self.history) > self.keep_last:
