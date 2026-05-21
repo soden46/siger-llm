@@ -136,6 +136,12 @@ grad_accum: 4
 max_seq_len: 256-384
 ```
 
+## SSM Scan Memory Policy
+
+`model/ssm_core.py` uses a streaming selective scan for full-sequence forward passes. The implementation intentionally avoids precomputing full `(B, L, D, N)` `dA`/`dB` tensors, because that can grow quickly with sequence length, inner dimension, and batch size. The preferred default keeps memory bounded around the recurrent state `(B, D, N)`, which matches the CPU/VPS target better.
+
+Single-token decode/cache experiments should call `SSMCore.step(...)` with shape `(B, 1, D)`. Full prompts and training batches should use `forward(...)`.
+
 ## Quantization
 
 Quantization modules live under:

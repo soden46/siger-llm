@@ -160,6 +160,12 @@ python tools\debug_lora_dataset.py data\corpus\curriculum_stage4_full_train.json
 {"system":"Kamu adalah SigerLM...","instruction":"Apa itu AI?","input":"","output":"AI adalah..."}
 ```
 
+Rows may optionally include a separate `reasoning` field:
+
+```json
+{"instruction":"Apa itu AI?","input":"","reasoning":"AI adalah bidang komputasi yang meniru kemampuan kognitif tertentu.","output":"AI adalah teknologi yang membuat komputer dapat melakukan tugas yang biasanya membutuhkan kecerdasan manusia."}
+```
+
 It formats them as:
 
 ```txt
@@ -167,6 +173,18 @@ It formats them as:
 <|user|>instruction + input<|end_turn|>
 <|assistant|>output<|end_turn|>
 ```
+
+When `reasoning` is present, the assistant turn becomes:
+
+```txt
+<|assistant|><thought>
+reasoning
+</thought>
+
+output<|end_turn|>
+```
+
+The default system prompt remains direct-answer oriented. `lora/dataset.py` only switches to the reasoning-aware system prompt for rows that actually provide a `reasoning` field, so ordinary instruction/chat data does not get contradictory supervision.
 
 Only assistant tokens contribute to the loss. System/user tokens are masked with `-100`.
 
@@ -178,7 +196,7 @@ logits[:, :-1] predicts labels[:, 1:]
 
 `lora/dataset.py` stores labels at their original token positions, so the trainer shift lets the `<|assistant|>` position predict the first answer token. Do not remove this shift unless the dataset label semantics are changed everywhere.
 
-Reasoning and uncertainty rows may include `<thought>...</thought>` inside the assistant output. These tokens are supervised like normal assistant text. The goal is to teach structured reasoning and honest confidence statements, not to make the model refuse ordinary tasks.
+Reasoning and uncertainty rows may include `<thought>...</thought>` either through the separate `reasoning` field or directly inside the assistant output for legacy rows. These tokens are supervised like normal assistant text. The goal is to teach structured reasoning and honest confidence statements on examples that call for it, not to make the model expose reasoning for every ordinary task.
 
 ## LoRA Targets
 

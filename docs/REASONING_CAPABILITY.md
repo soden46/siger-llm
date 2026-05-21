@@ -23,13 +23,23 @@ configs/training/indonesian_hf_mix_plus_kaggle_reasoning_lora.json
 
 ## Chain-of-Thought Format
 
-Preferred output format:
+Preferred local instruction row shape uses a separate `reasoning` field:
+
+```json
+{
+  "instruction": "Terjemahkan ke Dialek O: Kamu mau pergi ke mana?",
+  "reasoning": "Pertanyaan meminta Dialek O. Pilih subjek, kata mau, verba pergi, dan bentuk tanya ke mana.",
+  "output": "Niku ago mit jow?"
+}
+```
+
+`lora/dataset.py` formats that into the assistant turn:
 
 ```txt
 <thought> alasan runtut dan analisis konteks </thought> jawaban akhir
 ```
 
-Contoh:
+Legacy rows that already put `<thought>...</thought>` inside `output` are still valid:
 
 ```json
 {
@@ -93,6 +103,8 @@ python tools/build_instruction_corpus.py --registry configs/datasets/indonesian_
 ```
 
 Recommended starting ratio is `0.15` to `0.30`. Keep some normal rows so the model still learns to answer directly when reasoning is not requested.
+
+The default LoRA system prompt stays direct-answer oriented. The reasoning-aware prompt is used only for rows that provide a `reasoning` field, so normal instruction rows remain clean direct-answer supervision.
 
 ## Important Notes
 

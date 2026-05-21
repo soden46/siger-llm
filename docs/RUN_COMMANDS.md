@@ -267,7 +267,7 @@ Mining source Indonesia campuran dengan sebagian row dibuat Chain-of-Thought:
 python tools/mine_indonesian_hf_mix.py --max-items-per-source 50000 --cot-ratio 0.25
 ```
 
-`--cot-ratio 0.25` berarti sekitar 25% row diberi format `<thought>...</thought>` secara deterministik. Hindari langsung 100% untuk dataset besar agar model tetap bisa menjawab ringkas saat user tidak meminta penalaran.
+`--cot-ratio 0.25` berarti sekitar 25% row diberi reasoning trace secara deterministik. Format yang disukai adalah field `reasoning` terpisah, lalu `lora/dataset.py` membungkusnya sebagai `<thought>...</thought>` saat training. Hindari langsung 100% untuk dataset besar agar model tetap bisa menjawab ringkas saat user tidak meminta penalaran.
 
 Ingest dataset dari Kaggle Add Input:
 

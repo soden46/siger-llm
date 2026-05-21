@@ -92,8 +92,10 @@ docs/MODALITY_AGNOSTIC_BACKBONE.md     roadmap Siger sebagai backbone modality-a
 Preferred instruction row:
 
 ```json
-{"instruction":"...","input":"...","output":"...","system":"optional system prompt","source":"...","type":"..."}
+{"instruction":"...","input":"...","output":"...","system":"optional system prompt","reasoning":"optional reasoning trace","source":"...","type":"..."}
 ```
+
+`reasoning` is optional. When present, `lora/dataset.py` wraps it as `<thought>...</thought>` before the final answer and uses a reasoning-aware system prompt for that row only. Normal rows should keep direct-answer supervision.
 
 Preferred chat row for registry sources:
 
@@ -224,6 +226,8 @@ For model changes:
 3. `model/ssm_block.py`
 4. `model/siger_model.py`
 5. tests/smoke
+
+SSM full-sequence `forward()` should stay memory-conscious for CPU/VPS. Avoid materializing full `(B, L, D, N)` scan tensors unless a benchmark and fallback justify the tradeoff. Use `SSMCore.step()` only for single-token decode/cache experiments.
 
 For dataset/training changes:
 

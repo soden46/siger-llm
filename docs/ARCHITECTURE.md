@@ -476,6 +476,10 @@ for each timestep:
 
 Disebut selective karena parameter pembacaan dan update state dipengaruhi input. Token penting bisa memengaruhi bagaimana memori disimpan dan dibaca.
 
+`model/ssm_core.py` keeps the training/prefill path as a streaming selective scan. It computes `dA` and `dB` per timestep instead of materializing full `(B, L, D, N)` tensors. This is a deliberate CPU/VPS-friendly tradeoff: it may give up some vectorized speed on small batches, but it keeps memory bounded by the state shape `(B, D, N)`.
+
+`SSMCore.step(...)` is reserved for decode/cache experiments with a single token shaped `(B, 1, D)`. Full-sequence calls should use `forward(...)`.
+
 ## 9. Model Config
 
 Config kecil untuk smoke CPU:
@@ -534,7 +538,7 @@ Supported registry source formats:
 Preferred instruction row:
 
 ```json
-{"instruction":"...","input":"...","output":"...","system":"optional system prompt","source":"...","type":"..."}
+{"instruction":"...","input":"...","output":"...","system":"optional system prompt","reasoning":"optional reasoning trace","source":"...","type":"..."}
 ```
 
 Preferred chat row:
@@ -567,7 +571,7 @@ tools/build_reasoning_seed.py
   -> lora/run_lora.py
 ```
 
-Reasoning examples use `<thought>...</thought>` before the final answer. `inference/generator.py` is thought-aware so generation does not stop while a thought tag is still open.
+Reasoning examples preferably store the trace in the optional `reasoning` field. `lora/dataset.py` wraps that field as `<thought>...</thought>` before the final answer and only uses the reasoning-aware system prompt for rows that provide reasoning. Legacy rows with `<thought>...</thought>` already inside `output` remain supported. `inference/generator.py` is thought-aware so generation does not stop while a thought tag is still open.
 
 Uncertainty-awareness data follows the same instruction-source rule:
 

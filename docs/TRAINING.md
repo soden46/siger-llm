@@ -356,7 +356,7 @@ Current data strategy is data-centric:
 
 - Normalize noisy HF/Kaggle schemas into the SigerLM instruction row.
 - Keep the core model general; encode Lampung/Laravel capability through data, adapters, routing, and retrieval.
-- Add reasoning rows using `<thought>...</thought>` for structured problem solving.
+- Add reasoning rows with the optional `reasoning` field when possible; `lora/dataset.py` wraps it as `<thought>...</thought>` before the final answer. Legacy rows with `<thought>...</thought>` already inside `output` remain valid.
 - Add a small amount of uncertainty-awareness rows so the model can say what it knows, what it infers, and what needs verification.
 - Avoid hard-refusal for ordinary unknowns. Use helpful caveats and verification steps instead.
 - Keep hard refusal only for unsafe categories such as leaked secrets, credential handling, harmful instructions, medical diagnosis certainty, and financial certainty.

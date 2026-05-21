@@ -19,17 +19,30 @@ RECOMMENDED_DATASETS = {
 }
 
 
-SYSTEM_PROMPT = (
+DEFAULT_SYSTEM_PROMPT = (
     "Kamu adalah SigerLM, asisten AI umum yang cerdas, ringkas, dan akurat. "
     "Ikuti instruksi user dan jawab sesuai konteks."
 )
 
+REASONING_SYSTEM_PROMPT = (
+    "Kamu adalah SigerLM, asisten AI umum yang cerdas, ringkas, dan akurat. "
+    "Gunakan bagian <thought>...</thought> hanya jika contoh data menyediakannya."
+)
 
-def _chat_format(system_prompt: str, user_message: str, assistant_message: str) -> str:
+# Backward-compatible alias for older imports and HF formatters.
+SYSTEM_PROMPT = DEFAULT_SYSTEM_PROMPT
+
+
+def _chat_format(system_prompt: str, user_message: str, assistant_message: str, reasoning: str = "") -> str:
+    if reasoning:
+        assistant_content = f"<thought>\n{reasoning}\n</thought>\n\n{assistant_message}"
+    else:
+        assistant_content = assistant_message
+
     return (
         f"<|system|>{system_prompt}<|end_turn|>\n"
         f"<|user|>{user_message}<|end_turn|>\n"
-        f"<|assistant|>{assistant_message}<|end_turn|>"
+        f"<|assistant|>{assistant_content}<|end_turn|>"
     )
 
 
@@ -47,11 +60,12 @@ def format_local_instruction(example: Dict) -> str:
     <|user|>instruction + input<|end_turn|>
     <|assistant|>output<|end_turn|>
     """
-    system_prompt = str(example.get("system", SYSTEM_PROMPT)).strip() or SYSTEM_PROMPT
     instruction = str(example.get("instruction", "")).strip()
     input_text = str(example.get("input", "")).strip()
     reasoning = str(example.get("reasoning", "")).strip()
     output = str(example.get("output", "")).strip()
+    default_prompt = REASONING_SYSTEM_PROMPT if reasoning else DEFAULT_SYSTEM_PROMPT
+    system_prompt = str(example.get("system", default_prompt)).strip() or default_prompt
 
     if not instruction or not output:
         mined_text = format_mined_parallel_row(example, system_prompt)
@@ -66,15 +80,7 @@ def format_local_instruction(example: Dict) -> str:
     else:
         user_message = instruction
 
-    if reasoning:
-        assistant_message = (
-            f"Penjelasan:\n{reasoning}\n\n"
-            f"Jawaban:\n{output}"
-        )
-    else:
-        assistant_message = output
-
-    return _chat_format(system_prompt, user_message, assistant_message)
+    return _chat_format(system_prompt, user_message, output, reasoning=reasoning)
 
 
 def format_mined_parallel_row(example: Dict, system_prompt: str) -> str:
@@ -121,7 +127,7 @@ def format_hf_instruction(example: Dict, dataset_name: str) -> str:
     """
     if "ultrachat" in dataset_name:
         messages = example.get("messages", [])
-        parts = [f"<|system|>{SYSTEM_PROMPT}<|end_turn|>"]
+        parts = [f"<|system|>{DEFAULT_SYSTEM_PROMPT}<|end_turn|>"]
 
         for msg in messages:
             role = msg.get("role", "")
@@ -143,7 +149,7 @@ def format_hf_instruction(example: Dict, dataset_name: str) -> str:
         user_msg = f"{instruction}\n{inp}".strip() if inp else instruction
 
         return (
-            f"<|system|>{SYSTEM_PROMPT}<|end_turn|>\n"
+            f"<|system|>{DEFAULT_SYSTEM_PROMPT}<|end_turn|>\n"
             f"<|user|>{user_msg}<|end_turn|>\n"
             f"<|assistant|>{output}<|end_turn|>"
         )
@@ -314,6 +320,7 @@ class InstructionDataset(Dataset):
                 continue
 
             if token_id == end_turn_id and in_assistant_answer:
+                # Kita biarkan model belajar memprediksi token end_turn
                 labels[i] = token_id
                 in_assistant_answer = False
                 continue

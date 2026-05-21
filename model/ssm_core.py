@@ -1,5 +1,6 @@
 # model/ssm_core.py
 import math
+from typing import Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -18,15 +19,11 @@ class SSMCore(nn.Module):
         self.d_model = config.d_model
         self.d_state = config.d_state
         d_inner = config.d_model * config.expand
+        self.d_inner = d_inner
 
-        self.A_log = nn.Parameter(
-            torch.log(
-                torch.arange(1, config.d_state + 1)
-                .float()
-                .unsqueeze(0)
-                .repeat(d_inner, 1)
-            )
-        )
+        # S4D-style diagonal state initialization: A = -diag(1, 2, ..., N).
+        A_init = torch.arange(1, config.d_state + 1, dtype=torch.float32).repeat(d_inner, 1)
+        self.A_log = nn.Parameter(torch.log(A_init))
         self.D = nn.Parameter(torch.ones(d_inner))
 
         dt_rank = config.dt_rank if isinstance(config.dt_rank, int) else max(1, d_inner // 16)
@@ -50,26 +47,32 @@ class SSMCore(nn.Module):
         with torch.no_grad():
             self.dt_proj.bias.copy_(inv_dt)
 
-    def step(self, x_t: torch.Tensor, h: torch.Tensor | None = None):
-        B, _, D = x_t.shape
+    def step(self, x_t: torch.Tensor, h: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Single-token selective scan update for cached generation.
+        """
+        B, L, D = x_t.shape
+        if L != 1:
+            raise ValueError(f"SSMCore.step expects a single token, got sequence length {L}.")
+
         d_state = self.d_state
 
         if h is None:
             h = torch.zeros(B, D, d_state, device=x_t.device, dtype=x_t.dtype)
 
         A = -torch.exp(self.A_log.float()).to(x_t.dtype)
-        x_proj = self.x_proj(x_t)
+        x_now = x_t[:, 0]
+        x_proj = self.x_proj(x_now)
         dt_rank = self.dt_proj.in_features
         delta, B_mat, C_mat = x_proj.split([dt_rank, d_state, d_state], dim=-1)
         delta = F.softplus(self.dt_proj(delta))
 
-        dA = torch.exp(delta.squeeze(1).unsqueeze(-1) * A)
-        dB = delta.squeeze(1).unsqueeze(-1) * B_mat.squeeze(1).unsqueeze(-2)
-        x_now = x_t.squeeze(1).unsqueeze(-1)
-        h = dA * h + dB * x_now
+        dA = torch.exp(delta.unsqueeze(-1) * A)
+        dB = delta.unsqueeze(-1) * B_mat.unsqueeze(-2)
 
-        y = (h * C_mat.squeeze(1).unsqueeze(-2)).sum(-1)
-        y = y + x_t.squeeze(1) * self.D
+        h = dA * h + dB * x_now.unsqueeze(-1)
+        y = (h * C_mat.unsqueeze(-2)).sum(-1)
+        y = y + x_now * self.D
         return y.unsqueeze(1), h
 
     def forward(self, x):
@@ -82,10 +85,11 @@ class SSMCore(nn.Module):
         delta, B_mat, C_mat = x_proj.split([dt_rank, d_state, d_state], dim=-1)
         delta = F.softplus(self.dt_proj(delta))
 
-        # Streaming selective scan. Avoid materializing full dA/dB tensors with
-        # shape (B, L, D, N), which can OOM quickly on T4 GPUs.
+        # Streaming selective scan keeps memory bounded at (B, D, N). Materializing
+        # full (B, L, D, N) tensors is faster in small cases but risky on CPU/VPS.
         h = torch.zeros(B, D, d_state, device=x.device, dtype=x.dtype)
         ys = []
+
         for t in range(L):
             delta_t = delta[:, t]
             b_t = B_mat[:, t]
