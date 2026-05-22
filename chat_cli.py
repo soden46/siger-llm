@@ -168,6 +168,7 @@ def print_help() -> None:
     print("  /reason    reasoning Lampung O -> Indonesia")
     print("  /reorder   susun kata Lampung O")
     print("  /expertise general expertise orchestrator")
+    print("  /doc PATH   muat dokumen panjang ke long-context memory")
     print("Mode angka lama juga masih bisa: 0 auto, 1 LO->ID, 2 ID->LO, 3 LO->EN, 4 reasoning, 5 chat, 6 susun kata, 7 expertise.")
 
 
@@ -224,8 +225,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--checkpoint", default=None, help="Checkpoint path. Defaults to latest known SIGER checkpoint.")
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"], help="Inference device.")
     parser.add_argument("--prompt", default=None, help="Run one prompt and exit.")
-    parser.add_argument("--mode", default="auto", help="auto/chat/lo-id/id-lo/lo-en/reason/reorder or legacy 0-6.")
+    parser.add_argument("--mode", default="auto", help="auto/chat/lo-id/id-lo/lo-en/reason/reorder/expertise or legacy 0-7.")
     parser.add_argument("--max-new-tokens", type=int, default=80)
+    parser.add_argument("--max-context-tokens", type=int, default=1024, help="Prompt budget for chat long-context memory.")
+    parser.add_argument("--retrieval-top-k", type=int, default=5, help="Number of memory chunks retrieved into prompts.")
+    parser.add_argument("--retrieval-token-budget", type=int, default=None, help="Token budget for retrieved long-context chunks.")
+    parser.add_argument("--recent-turn-token-budget", type=int, default=None, help="Token budget for recent chat turns.")
+    parser.add_argument("--long-input-threshold-chars", type=int, default=1200, help="Store longer user inputs as retrievable context.")
+    parser.add_argument("--context-file", action="append", default=[], help="Load a text file into long-context memory before answering.")
     parser.add_argument("--info", action="store_true", help="Print model info and exit.")
     return parser.parse_args()
 
@@ -250,10 +257,32 @@ def main() -> None:
     if device == "auto":
         device = "cpu"
     gen = Generator(model, tok, device=device)
-    chat = ChatSession(gen, max_context_tokens=1024)
+    chat = ChatSession(
+        gen,
+        max_context_tokens=args.max_context_tokens,
+        retrieval_top_k=args.retrieval_top_k,
+        retrieval_token_budget=args.retrieval_token_budget,
+        recent_turn_token_budget=args.recent_turn_token_budget,
+        long_input_threshold_chars=args.long_input_threshold_chars,
+    )
     lampung = LampungPipeline(gen, tok)
     router = SigerRouter(chat, lampung)
-    expertise = ExpertiseOrchestrator(gen, lampung)
+    expertise = ExpertiseOrchestrator(
+        gen,
+        lampung,
+        memory=chat.memory,
+        retrieval_top_k=args.retrieval_top_k,
+        retrieval_token_budget=args.retrieval_token_budget or max(96, int(args.max_context_tokens * 0.35)),
+        long_input_threshold_chars=args.long_input_threshold_chars,
+    )
+
+    for context_path in args.context_file:
+        path = Path(context_path)
+        if not path.exists():
+            raise FileNotFoundError(f"Context file not found: {path}")
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        chat.add_document(text, metadata={"source": str(path), "title": path.name})
+        print(f"Loaded context file: {path} ({len(text):,} chars)")
 
     if args.info:
         print(f"Device: {device}")
@@ -294,6 +323,17 @@ def main() -> None:
 
         if command == "/memory":
             print(f"Memory: {chat.memory_stats()}")
+            continue
+
+        if command.startswith("/doc "):
+            path = Path(text[5:].strip())
+            if path.exists():
+                doc_text = path.read_text(encoding="utf-8", errors="ignore")
+                chat.add_document(doc_text, metadata={"source": str(path), "title": path.name})
+                print(f"Loaded document: {path} ({len(doc_text):,} chars)")
+                print(f"Memory: {chat.memory_stats()}")
+            else:
+                print(f"Document not found: {path}")
             continue
 
         slash_modes = {

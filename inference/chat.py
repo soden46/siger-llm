@@ -26,11 +26,19 @@ class ChatSession:
         max_history: int = 10,
         max_context_tokens: int = 1024,
         retrieval_top_k: int = 5,
+        retrieval_token_budget: int | None = None,
+        recent_turn_token_budget: int | None = None,
+        long_input_threshold_chars: int = 1200,
+        document_chunk_size_words: int = 180,
+        document_overlap_words: int = 40,
     ):
         self.generator = generator
         self.system_prompt = system_prompt or self.SYSTEM_PROMPT
         self.max_history = max_history
         self.max_context_tokens = max_context_tokens
+        self.long_input_threshold_chars = long_input_threshold_chars
+        self.document_chunk_size_words = document_chunk_size_words
+        self.document_overlap_words = document_overlap_words
         self.history: list[dict] = []
 
         self.memory = SessionMemory(max_recent_turns=max_history)
@@ -39,6 +47,8 @@ class ChatSession:
             memory=self.memory,
             max_context_tokens=max_context_tokens,
             retrieval_top_k=retrieval_top_k,
+            retrieval_token_budget=retrieval_token_budget,
+            recent_turn_token_budget=recent_turn_token_budget,
         )
 
     def _build_prompt(self, user_input: str) -> str:
@@ -53,7 +63,13 @@ class ChatSession:
         stream: bool = False,
         **gen_kwargs,
     ) -> str:
-        prompt = self._build_prompt(user_input)
+        effective_user_input = self.memory.ingest_long_user_message(
+            user_input,
+            max_inline_chars=self.long_input_threshold_chars,
+            chunk_size_words=self.document_chunk_size_words,
+            overlap_words=self.document_overlap_words,
+        )
+        prompt = self._build_prompt(effective_user_input)
 
         if stream:
             response = self._stream_response(prompt, **gen_kwargs)
@@ -69,12 +85,12 @@ class ChatSession:
                 **gen_kwargs,
             )
 
-        self.history.append({"role": "user", "content": user_input})
+        self.history.append({"role": "user", "content": effective_user_input})
         self.history.append({"role": "assistant", "content": response})
         if len(self.history) > self.max_history * 2:
             self.history = self.history[-self.max_history * 2 :]
 
-        self.memory.add_turn("user", user_input)
+        self.memory.add_turn("user", effective_user_input)
         self.memory.add_turn("assistant", response)
         return response
 
@@ -92,7 +108,12 @@ class ChatSession:
         return full_response.strip()
 
     def add_document(self, text: str, metadata: Optional[dict] = None) -> None:
-        self.memory.add_document(text, metadata=metadata)
+        self.memory.add_document(
+            text,
+            metadata=metadata,
+            chunk_size_words=self.document_chunk_size_words,
+            overlap_words=self.document_overlap_words,
+        )
 
     def add_pinned_fact(self, fact: str) -> None:
         self.memory.add_pinned_fact(fact)
@@ -101,8 +122,11 @@ class ChatSession:
         return {
             "turns": len(self.memory.turns),
             "chunks": len(self.memory.chunk_store.chunks),
+            "documents": self.memory.document_count,
+            "long_context_chars": self.memory.long_context_chars,
             "pinned_facts": len(self.memory.pinned_facts),
             "summary_chars": len(self.memory.summary),
+            "long_summary_chars": len(self.memory.long_context_summary),
             "max_context_tokens": self.max_context_tokens,
         }
 

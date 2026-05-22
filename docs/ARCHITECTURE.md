@@ -334,6 +334,11 @@ registries, LoRA stages, retrieval/tools when needed, and runtime orchestration
 outside the core model. The domain-extension and feedback-repair workflow is
 documented in `docs/EXPERTISE_CURRICULUM.md`.
 
+Large context should also stay outside the core model first. Use chunked memory,
+retrieval, compact summaries, and token-budgeted prompt assembly before trying
+to grow native context length. The implementation and operating guidance are in
+`docs/LONG_CONTEXT.md`.
+
 End-to-end forward pass:
 
 ```txt

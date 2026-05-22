@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from inference.generator import Generator
 from inference.lampung_pipeline import LampungPipeline
+from memory.session_memory import SessionMemory
 
 
 @dataclass(frozen=True)
@@ -167,9 +168,17 @@ class ExpertiseOrchestrator:
         self,
         generator: Generator,
         lampung: LampungPipeline | None = None,
+        memory: SessionMemory | None = None,
+        retrieval_top_k: int = 5,
+        retrieval_token_budget: int = 320,
+        long_input_threshold_chars: int = 1200,
     ) -> None:
         self.generator = generator
         self.lampung = lampung
+        self.memory = memory
+        self.retrieval_top_k = retrieval_top_k
+        self.retrieval_token_budget = retrieval_token_budget
+        self.long_input_threshold_chars = long_input_threshold_chars
 
     def route(
         self,
@@ -177,15 +186,20 @@ class ExpertiseOrchestrator:
         max_new_tokens: int = 160,
         max_domains: int = 4,
     ) -> ExpertiseResponse:
-        task_summary = self.summarize_task(text)
-        specs = self.detect_expertise(text, max_domains=max_domains)
-        drafts = [self._run_expertise(spec, text, task_summary, max_new_tokens) for spec in specs]
+        effective_text = self._prepare_user_text(text)
+        task_summary = self.summarize_task(effective_text)
+        specs = self.detect_expertise(effective_text, max_domains=max_domains)
+        retrieved_context = self._retrieved_context(effective_text)
+        drafts = [
+            self._run_expertise(spec, effective_text, task_summary, max_new_tokens, retrieved_context)
+            for spec in specs
+        ]
 
         if len(drafts) == 1:
             final_text = drafts[0].text.strip()
             source = drafts[0].source
         else:
-            final_text = self._synthesize(text, task_summary, drafts, max_new_tokens)
+            final_text = self._synthesize(effective_text, task_summary, drafts, max_new_tokens, retrieved_context)
             source = "expertise synthesis"
 
         return ExpertiseResponse(
@@ -239,6 +253,7 @@ class ExpertiseOrchestrator:
         user_text: str,
         task_summary: str,
         max_new_tokens: int,
+        retrieved_context: str = "",
     ) -> ExpertiseDraft:
         if spec.name == "lampung" and self.lampung is not None and self.looks_lampung(self._norm(user_text)):
             response = self.lampung.reason_lo_to_id(user_text, max_new_tokens=max(80, max_new_tokens // 2))
@@ -247,6 +262,7 @@ class ExpertiseOrchestrator:
         prompt = (
             f"<|system|>{spec.system_prompt}<|end_turn|>\n"
             f"<|user|>Ringkasan tugas: {task_summary}\n\n"
+            f"{self._context_block(retrieved_context)}"
             f"Fokus expertise: {spec.focus_prompt}\n\n"
             f"Permintaan user:\n{user_text}<|end_turn|>\n"
             "<|assistant|>"
@@ -270,6 +286,7 @@ class ExpertiseOrchestrator:
         task_summary: str,
         drafts: list[ExpertiseDraft],
         max_new_tokens: int,
+        retrieved_context: str = "",
     ) -> str:
         draft_text = "\n\n".join(
             f"[{draft.domain}]\n{draft.text}" for draft in drafts if draft.text.strip()
@@ -277,6 +294,7 @@ class ExpertiseOrchestrator:
         prompt = (
             f"<|system|>{self.SYNTHESIS_SYSTEM_PROMPT}<|end_turn|>\n"
             f"<|user|>Ringkasan tugas: {task_summary}\n\n"
+            f"{self._context_block(retrieved_context)}"
             f"Permintaan asli:\n{user_text}\n\n"
             f"Draft expertise:\n{draft_text}\n\n"
             "Gabungkan menjadi jawaban final yang praktis, ringkas, dan tidak berulang.<|end_turn|>\n"
@@ -302,3 +320,51 @@ class ExpertiseOrchestrator:
 
     def _norm(self, text: str) -> str:
         return " ".join(text.strip().lower().split())
+
+    def _prepare_user_text(self, text: str) -> str:
+        if self.memory is None:
+            return text
+        return self.memory.ingest_long_user_message(
+            text,
+            max_inline_chars=self.long_input_threshold_chars,
+        )
+
+    def _retrieved_context(self, query: str) -> str:
+        if self.memory is None:
+            return ""
+        chunks = self.memory.retrieve(query, top_k=self.retrieval_top_k)
+        parts: list[str] = []
+        used = 0
+        for index, chunk in enumerate(chunks, start=1):
+            label = chunk.metadata.get("source") or chunk.metadata.get("type") or f"chunk_{index}"
+            candidate = f"[{index}: {label}]\n{chunk.text}"
+            n_tokens = self._count_tokens(candidate)
+            if used + n_tokens > self.retrieval_token_budget:
+                remaining = self.retrieval_token_budget - used
+                if remaining > 40:
+                    candidate = self._truncate_to_tokens(candidate, remaining)
+                    parts.append(candidate)
+                break
+            parts.append(candidate)
+            used += n_tokens
+        return "\n\n".join(parts)
+
+    def _context_block(self, retrieved_context: str) -> str:
+        if not retrieved_context:
+            return ""
+        return f"Konteks relevan dari long-context memory:\n{retrieved_context}\n\n"
+
+    def _count_tokens(self, text: str) -> int:
+        try:
+            return int(self.generator.tokenizer.count_tokens(text))
+        except Exception:
+            return max(1, len(text) // 4)
+
+    def _truncate_to_tokens(self, text: str, max_tokens: int) -> str:
+        try:
+            ids = self.generator.tokenizer.encode(text)
+            if len(ids) <= max_tokens:
+                return text
+            return self.generator.tokenizer.decode(ids[:max_tokens], skip_special_tokens=False)
+        except Exception:
+            return text[: max(1, max_tokens * 4)].rstrip()

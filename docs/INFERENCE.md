@@ -29,8 +29,71 @@ output = gen.generate(
 ```python
 from inference.chat import ChatSession
 
-chat = ChatSession(gen, max_context_tokens=1024)
+chat = ChatSession(
+    gen,
+    max_context_tokens=1024,
+    retrieval_top_k=5,
+    retrieval_token_budget=360,
+    long_input_threshold_chars=1200,
+)
 reply = chat.chat("Apa itu AI?", max_new_tokens=80)
+```
+
+## Long-Context Memory
+
+SigerLM does not need to put every token from a large document into the prompt.
+Long context is handled with a retrieval budget:
+
+```txt
+large document or long user message
+  -> chunk into overlapping word windows
+  -> store in SessionMemory
+  -> retrieve top-k relevant chunks for each question
+  -> fit retrieved chunks, summaries, recent turns, and user prompt into max_context_tokens
+```
+
+This gives "large context" behavior while keeping the actual model prompt small.
+It is the preferred path for CPU/VPS and small SSM checkpoints.
+
+Load a document in Python:
+
+```python
+chat.add_document(
+    long_text,
+    metadata={"source": "project_spec.md", "title": "Project Spec"},
+)
+reply = chat.chat("Ringkas bagian deployment dan security.", max_new_tokens=160)
+```
+
+Load a document from CLI:
+
+```powershell
+python chat_cli.py --checkpoint checkpoints\lora\model_cpu_repair_general_merged.pt --context-file docs\ARCHITECTURE.md --mode chat --prompt "Apa poin arsitektur yang relevan untuk inference?"
+```
+
+Interactive CLI:
+
+```txt
+/doc docs/ARCHITECTURE.md
+/memory
+Apa bagian yang menjelaskan domain Lampung?
+```
+
+Useful long-context knobs:
+
+```txt
+--max-context-tokens             hard prompt budget, default 1024
+--retrieval-top-k                number of chunks to retrieve, default 5
+--retrieval-token-budget         token budget for retrieved chunks
+--recent-turn-token-budget       token budget for recent chat turns
+--long-input-threshold-chars     long user messages above this are stored as documents
+```
+
+For current small checkpoints, keep native prompt budget modest:
+
+```txt
+CPU safe: 768-1024 max_context_tokens
+GPU test: 1024-2048 max_context_tokens
 ```
 
 ## Lampung Pipeline
