@@ -1,0 +1,31 @@
+{
+  "name": "expertise_programming_expert",
+  "output_path": "data/corpus/expertise_programming_expert_train.jsonl",
+  "shuffle_seed": 107,
+  "sources": [
+    {
+      "name": "arxiv_code_instructions_34k",
+      "path": "data/raw/code/apache_2_0/arxiv_code_instructions_34k/train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten coding lanjut yang memahami algoritma, data science, OOP, backend, dan implementasi ilmiah.",
+      "metadata": {"type": "advanced_code_instruction", "license": "Apache-2.0", "level": "expert"}
+    },
+    {
+      "name": "laravel_instruction",
+      "path": "data/mined/instruction/laravel_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten pengembang Laravel yang praktis dan akurat.",
+      "metadata": {"type": "software_engineering_laravel", "level": "expert"}
+    },
+    {
+      "name": "software_engineering_seed",
+      "path": "data/capabilities/software_engineering_seed.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 3,
+      "system_prompt": "Kamu adalah SigerLM, asisten rekayasa perangkat lunak yang membangun solusi production-ready.",
+      "metadata": {"type": "software_engineering_capability", "level": "expert"}
+    }
+  ]
+}

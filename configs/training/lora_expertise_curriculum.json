@@ -1,0 +1,46 @@
+{
+  "name": "sigerlm_expertise_neural_curriculum",
+  "description": "Separated expertise curriculum: Indonesian, Lampung, general knowledge, reasoning, programming basic, programming intermediate, programming expert, then neural mixer.",
+  "stages": [
+    {
+      "name": "expertise_indonesian",
+      "dataset_registry": "configs/datasets/expertise_indonesian.json",
+      "training_config": "configs/training/expertise_indonesian_lora.json"
+    },
+    {
+      "name": "expertise_lampung",
+      "dataset_registry": "configs/datasets/expertise_lampung.json",
+      "training_config": "configs/training/expertise_lampung_lora.json"
+    },
+    {
+      "name": "expertise_general_knowledge",
+      "dataset_registry": "configs/datasets/expertise_general_knowledge.json",
+      "training_config": "configs/training/expertise_general_knowledge_lora.json"
+    },
+    {
+      "name": "expertise_reasoning",
+      "dataset_registry": "configs/datasets/expertise_reasoning.json",
+      "training_config": "configs/training/expertise_reasoning_lora.json"
+    },
+    {
+      "name": "expertise_programming_basic",
+      "dataset_registry": "configs/datasets/expertise_programming_basic.json",
+      "training_config": "configs/training/expertise_programming_basic_lora.json"
+    },
+    {
+      "name": "expertise_programming_intermediate",
+      "dataset_registry": "configs/datasets/expertise_programming_intermediate.json",
+      "training_config": "configs/training/expertise_programming_intermediate_lora.json"
+    },
+    {
+      "name": "expertise_programming_expert",
+      "dataset_registry": "configs/datasets/expertise_programming_expert.json",
+      "training_config": "configs/training/expertise_programming_expert_lora.json"
+    },
+    {
+      "name": "expertise_neural_mixer",
+      "dataset_registry": "configs/datasets/expertise_neural_mixer.json",
+      "training_config": "configs/training/expertise_neural_mixer_lora.json"
+    }
+  ]
+}

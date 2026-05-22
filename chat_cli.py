@@ -7,6 +7,7 @@ import re
 from config.model_config import SigerConfig
 from config.model_identity import canonical_model_name
 from inference.chat import ChatSession
+from inference.expertise_router import ExpertiseOrchestrator
 from inference.generator import Generator
 from inference.lampung_pipeline import LampungPipeline, LampungResponse
 from inference.router import SigerRouter
@@ -166,7 +167,8 @@ def print_help() -> None:
     print("  /lo-en     Lampung O -> English")
     print("  /reason    reasoning Lampung O -> Indonesia")
     print("  /reorder   susun kata Lampung O")
-    print("Mode angka lama juga masih bisa: 0 auto, 1 LO->ID, 2 ID->LO, 3 LO->EN, 4 reasoning, 5 chat, 6 susun kata.")
+    print("  /expertise general expertise orchestrator")
+    print("Mode angka lama juga masih bisa: 0 auto, 1 LO->ID, 2 ID->LO, 3 LO->EN, 4 reasoning, 5 chat, 6 susun kata, 7 expertise.")
 
 
 def read_followup_input() -> str:
@@ -180,6 +182,7 @@ def handle_manual_mode(
     chat: ChatSession,
     lampung: LampungPipeline,
     router: SigerRouter,
+    expertise: ExpertiseOrchestrator,
 ) -> None:
     if mode in {"0", "auto"}:
         response = router.route(text)
@@ -206,6 +209,12 @@ def handle_manual_mode(
         print(f"Memory: {chat.memory_stats()}")
     elif mode == "6":
         print_response("Susunan", lampung.reorder("Lampung O", text))
+    elif mode == "7":
+        response = expertise.route(text, max_new_tokens=120)
+        print(f"Expertise: {response.text!r}")
+        print(f"Domains: {', '.join(response.domains)}")
+        print(f"Summary: {response.task_summary}")
+        print(f"Source: {response.source}")
     else:
         print("Mode tidak dikenal.")
 
@@ -230,6 +239,7 @@ def normalize_mode(mode: str) -> str:
         "reason": "4",
         "chat": "5",
         "reorder": "6",
+        "expertise": "7",
     }.get(mode.lower(), mode)
 
 
@@ -243,6 +253,7 @@ def main() -> None:
     chat = ChatSession(gen, max_context_tokens=1024)
     lampung = LampungPipeline(gen, tok)
     router = SigerRouter(chat, lampung)
+    expertise = ExpertiseOrchestrator(gen, lampung)
 
     if args.info:
         print(f"Device: {device}")
@@ -257,6 +268,7 @@ def main() -> None:
             chat=chat,
             lampung=lampung,
             router=router,
+            expertise=expertise,
         )
         return
 
@@ -292,6 +304,7 @@ def main() -> None:
             "/reason": "4",
             "/chat": "5",
             "/reorder": "6",
+            "/expertise": "7",
         }
 
         if command in slash_modes:
@@ -303,18 +316,20 @@ def main() -> None:
                     chat=chat,
                     lampung=lampung,
                     router=router,
+                    expertise=expertise,
                 )
             continue
 
-        if command in {"0", "auto", "1", "2", "3", "4", "5", "6"}:
+        if command in {"0", "auto", "1", "2", "3", "4", "5", "6", "7", "expertise"}:
             followup = read_followup_input()
             if followup:
                 handle_manual_mode(
-                    command,
+                    normalize_mode(command),
                     followup,
                     chat=chat,
                     lampung=lampung,
                     router=router,
+                    expertise=expertise,
                 )
             continue
 

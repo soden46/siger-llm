@@ -1,0 +1,47 @@
+{
+  "name": "expertise_lampung",
+  "output_path": "data/corpus/expertise_lampung_train.jsonl",
+  "shuffle_seed": 102,
+  "sources": [
+    {
+      "name": "lampung_basic_train",
+      "path": "data/lampung/final/train_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 2,
+      "system_prompt": "Kamu adalah SigerLM, asisten Bahasa Lampung Dialek O dan Bahasa Indonesia. Jawab akurat dan ringkas.",
+      "metadata": {"type": "lampung_basic_instruction"}
+    },
+    {
+      "name": "lampung_augmented_train",
+      "path": "data/lampung/final/train_augmented_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten Bahasa Lampung Dialek O, Bahasa Indonesia, dan English.",
+      "metadata": {"type": "lampung_augmented_instruction"}
+    },
+    {
+      "name": "lampung_reasoning_train",
+      "path": "data/lampung/final/train_reasoning_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten Bahasa Lampung yang bernalar runtut dan tidak mengarang.",
+      "metadata": {"type": "lampung_reasoning"}
+    },
+    {
+      "name": "lampung_word_order_train",
+      "path": "data/lampung/final/train_word_order_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten Bahasa Lampung yang memahami urutan kata dan terjemahan.",
+      "metadata": {"type": "lampung_word_order"}
+    },
+    {
+      "name": "lampung_kamus_full",
+      "path": "data/mined/instruction/kamus_lampung_o_full_sigerlm.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten kamus Lampung Dialek O dan Bahasa Indonesia.",
+      "metadata": {"type": "lampung_dictionary"}
+    }
+  ]
+}

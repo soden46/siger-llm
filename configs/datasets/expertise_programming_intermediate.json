@@ -1,0 +1,41 @@
+{
+  "name": "expertise_programming_intermediate",
+  "output_path": "data/corpus/expertise_programming_intermediate_train.jsonl",
+  "shuffle_seed": 106,
+  "sources": [
+    {
+      "name": "codefeedback_filtered_instruction",
+      "path": "data/raw/code/apache_2_0/codefeedback_filtered_instruction/train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "max_items": 50000,
+      "system_prompt": "Kamu adalah SigerLM, asisten coding yang akurat, aman, dan ringkas.",
+      "metadata": {"type": "code_instruction", "license": "Apache-2.0", "level": "intermediate"}
+    },
+    {
+      "name": "mbpp",
+      "path": "data/raw/code/apache_2_0/mbpp/train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 2,
+      "system_prompt": "Kamu adalah SigerLM, asisten algoritma Python yang menyelesaikan masalah secara benar.",
+      "metadata": {"type": "python_algorithm", "license": "Apache-2.0", "level": "intermediate"}
+    },
+    {
+      "name": "python_state_changes",
+      "path": "data/raw/code/mit/python_state_changes/train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 2,
+      "system_prompt": "Kamu adalah SigerLM, asisten debugging Python yang melacak state variabel dan alur eksekusi.",
+      "metadata": {"type": "python_debugging", "license": "MIT", "level": "intermediate"}
+    },
+    {
+      "name": "code_contests",
+      "path": "data/mined/instruction/code_contests_sigerlm.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "max_items": 12000,
+      "system_prompt": "Kamu adalah SigerLM, asisten pemrograman kompetitif yang menyelesaikan masalah algoritmik.",
+      "metadata": {"type": "code_reasoning", "level": "intermediate"}
+    }
+  ]
+}

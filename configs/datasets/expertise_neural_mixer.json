@@ -1,0 +1,63 @@
+{
+  "name": "expertise_neural_mixer",
+  "output_path": "data/corpus/expertise_neural_mixer_train.jsonl",
+  "shuffle_seed": 109,
+  "sources": [
+    {
+      "name": "indonesian_expertise",
+      "path": "data/corpus/expertise_indonesian_train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 2,
+      "system_prompt": "Kamu adalah SigerLM, asisten umum Bahasa Indonesia yang akurat.",
+      "metadata": {"type": "mixer_indonesian"}
+    },
+    {
+      "name": "lampung_expertise",
+      "path": "data/corpus/expertise_lampung_train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 2,
+      "system_prompt": "Kamu adalah SigerLM, asisten Bahasa Lampung dan Bahasa Indonesia.",
+      "metadata": {"type": "mixer_lampung"}
+    },
+    {
+      "name": "general_knowledge_expertise",
+      "path": "data/corpus/expertise_general_knowledge_train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten umum yang cerdas dan ringkas.",
+      "metadata": {"type": "mixer_general_knowledge"}
+    },
+    {
+      "name": "reasoning_expertise",
+      "path": "data/corpus/expertise_reasoning_train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten penalaran yang runtut.",
+      "metadata": {"type": "mixer_reasoning"}
+    },
+    {
+      "name": "programming_basic_expertise",
+      "path": "data/corpus/expertise_programming_basic_train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten coding dasar yang jelas dan benar.",
+      "metadata": {"type": "mixer_programming_basic"}
+    },
+    {
+      "name": "programming_intermediate_expertise",
+      "path": "data/corpus/expertise_programming_intermediate_train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten algoritma dan debugging yang akurat.",
+      "metadata": {"type": "mixer_programming_intermediate"}
+    },
+    {
+      "name": "programming_expert_expertise",
+      "path": "data/corpus/expertise_programming_expert_train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten rekayasa perangkat lunak production-ready.",
+      "metadata": {"type": "mixer_programming_expert"}
+    }
+  ]
+}

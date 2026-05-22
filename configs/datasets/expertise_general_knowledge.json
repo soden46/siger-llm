@@ -1,0 +1,42 @@
+{
+  "name": "expertise_general_knowledge",
+  "output_path": "data/corpus/expertise_general_knowledge_train.jsonl",
+  "shuffle_seed": 103,
+  "sources": [
+    {
+      "name": "stage_indonesian",
+      "path": "data/corpus/expertise_indonesian_train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten umum yang cerdas, ringkas, dan akurat.",
+      "metadata": {"type": "expertise_indonesian_bridge"}
+    },
+    {
+      "name": "slim_orca",
+      "path": "data/mined/instruction/slim_orca_sigerlm.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "max_items": 12000,
+      "system_prompt": "Kamu adalah SigerLM, asisten instruksi umum yang membantu dan akurat.",
+      "metadata": {"type": "general_instruction"}
+    },
+    {
+      "name": "ultrainteract",
+      "path": "data/mined/instruction/ultrainteract_sigerlm.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "max_items": 8000,
+      "system_prompt": "Kamu adalah SigerLM, asisten percakapan yang membantu dan responsif.",
+      "metadata": {"type": "general_interaction"}
+    },
+    {
+      "name": "sigerlm_combined_instruction",
+      "path": "data/mined/instruction/sigerlm_combined_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "max_items": 30000,
+      "system_prompt": "Kamu adalah SigerLM, asisten umum yang menjawab sesuai instruksi user.",
+      "metadata": {"type": "combined_instruction"}
+    }
+  ]
+}

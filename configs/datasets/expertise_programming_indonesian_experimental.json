@@ -1,0 +1,20 @@
+{
+  "name": "expertise_programming_indonesian_experimental",
+  "output_path": "data/corpus/expertise_programming_indonesian_experimental_train.jsonl",
+  "shuffle_seed": 108,
+  "sources": [
+    {
+      "name": "evol_instruct_indonesian_code_slices",
+      "path": "data/raw/instruction/noncommercial/evol_instruct_indonesian_code_slices.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten coding Bahasa Indonesia yang mengikuti instruksi dengan akurat.",
+      "metadata": {
+        "type": "indonesian_code_instruction_experimental",
+        "license": "Apache-2.0",
+        "commercial_safe": false,
+        "note": "Keep out of commercial-safe runs unless lineage is re-audited."
+      }
+    }
+  ]
+}

@@ -1,9 +1,10 @@
 # Inference
 
-SigerLM inference has two layers:
+SigerLM inference has three layers:
 
 1. Raw generation/chat with `Generator` and `ChatSession`.
 2. Routed inference with `SigerRouter`, which can call general chat or Lampung domain tools.
+3. Expertise orchestration with `ExpertiseOrchestrator`, which decomposes a user task into domain expertise drafts and synthesizes a final answer.
 
 ## Generator
 
@@ -72,6 +73,43 @@ id_to_lampung
 lampung_to_en
 ```
 
+## Expertise Orchestrator
+
+`ExpertiseOrchestrator` is the runtime counterpart of the separated expertise
+curriculum. It acts like a general coordinator:
+
+1. summarize the user task
+2. detect relevant domains
+3. ask focused expertise prompts
+4. synthesize the final answer
+
+It does not put domain rules into the core model. Lampung still uses the
+lookup-first pipeline when relevant.
+
+```python
+from inference.expertise_router import ExpertiseOrchestrator
+
+expertise = ExpertiseOrchestrator(gen, lampung)
+response = expertise.route(
+    "Buat blueprint REST API todo dengan FastAPI, PostgreSQL, Docker, test, logging JSON, dan COMPLIANCE.md."
+)
+print(response.domains)
+print(response.task_summary)
+print(response.text)
+```
+
+Known expertise domains:
+
+```txt
+indonesian
+lampung
+general_knowledge
+reasoning
+programming_basic
+programming_intermediate
+programming_expert
+```
+
 ## CLI
 
 ```powershell
@@ -97,9 +135,16 @@ Optional commands are still available for manual testing:
 /reason    Lampung reasoning
 /chat      force general chat
 /reorder   Lampung word order
+/expertise general expertise orchestrator
 ```
 
-Legacy numeric modes are also supported: `0` auto, `1` LO->ID, `2` ID->LO, `3` LO->EN, `4` reasoning, `5` chat, `6` word order.
+Legacy numeric modes are also supported: `0` auto, `1` LO->ID, `2` ID->LO, `3` LO->EN, `4` reasoning, `5` chat, `6` word order, `7` expertise.
+
+Expertise mode:
+
+```powershell
+python chat_cli.py --mode expertise --prompt "Jelaskan struktur kalimat Lampung berikut dan buat contoh FastAPI endpoint untuk menyimpan hasil terjemahan: Nyak haga mengan manuk di warung paghek jalan"
+```
 
 Lampung O -> English:
 

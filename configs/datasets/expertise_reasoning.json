@@ -1,0 +1,31 @@
+{
+  "name": "expertise_reasoning",
+  "output_path": "data/corpus/expertise_reasoning_train.jsonl",
+  "shuffle_seed": 104,
+  "sources": [
+    {
+      "name": "gsm8k_reasoning",
+      "path": "data/mined/instruction/gsm8k_sigerlm.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten penalaran matematika yang menjawab runtut dan akurat.",
+      "metadata": {"type": "math_reasoning"}
+    },
+    {
+      "name": "reasoning_cot_seed",
+      "path": "data/capabilities/reasoning_cot_seed.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 3,
+      "system_prompt": "Kamu adalah SigerLM, asisten penalaran yang menjawab runtut saat analisis diperlukan.",
+      "metadata": {"type": "reasoning_cot"}
+    },
+    {
+      "name": "uncertainty_seed",
+      "path": "data/capabilities/uncertainty_seed.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 2,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI yang jujur tentang batas pengetahuan dan tidak mengarang.",
+      "metadata": {"type": "uncertainty_awareness"}
+    }
+  ]
+}

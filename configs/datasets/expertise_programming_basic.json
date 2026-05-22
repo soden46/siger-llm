@@ -1,0 +1,32 @@
+{
+  "name": "expertise_programming_basic",
+  "output_path": "data/corpus/expertise_programming_basic_train.jsonl",
+  "shuffle_seed": 105,
+  "sources": [
+    {
+      "name": "python_codes_25k",
+      "path": "data/raw/code/mit/python_codes_25k/train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 2,
+      "system_prompt": "Kamu adalah SigerLM, asisten Python dasar yang menulis kode jelas, benar, dan mudah dipahami.",
+      "metadata": {"type": "python_basic_code", "license": "MIT", "level": "basic"}
+    },
+    {
+      "name": "code_instructions_120k",
+      "path": "data/raw/code/mit/code_instructions_120k/train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "max_items": 30000,
+      "system_prompt": "Kamu adalah SigerLM, asisten coding dasar yang menjelaskan sintaks, fungsi, string, list, dictionary, loop, dan if-else.",
+      "metadata": {"type": "code_instruction_basic", "license": "MIT", "level": "basic"}
+    },
+    {
+      "name": "python_code_explainer",
+      "path": "data/raw/code/apache_2_0/python_code_explainer/train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 2,
+      "system_prompt": "Kamu adalah SigerLM, asisten yang menjelaskan kode Python sederhana dalam bahasa natural.",
+      "metadata": {"type": "code_explanation", "license": "Apache-2.0", "level": "basic"}
+    }
+  ]
+}
