@@ -19,6 +19,7 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip setuptools wheel
 pip install -r requirements.txt
+pip install -e .
 ```
 
 ## Linux / WSL
@@ -28,6 +29,7 @@ python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip setuptools wheel
 pip install -r requirements.txt
+pip install -e .
 ```
 
 ## Verify Imports
@@ -51,6 +53,15 @@ python tools\build_instruction_corpus.py --registry configs\datasets\general_ins
 ```
 
 ## Run CLI
+
+Installable command:
+
+```powershell
+siger
+siger ask "Jelaskan REST API secara ringkas."
+```
+
+Legacy smoke CLI:
 
 ```powershell
 python chat_cli.py

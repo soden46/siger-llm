@@ -175,11 +175,27 @@ programming_expert
 
 ## CLI
 
+Installable command:
+
+```powershell
+pip install -e .
+siger
+siger ask "Jelaskan REST API secara ringkas."
+siger chat --context-file docs\ARCHITECTURE.md
+siger config set checkpoint checkpoints\lora\model_cpu_repair_general_merged.pt
+```
+
+See `docs/CLI.md` for the full command guide.
+
+Legacy script:
+
 ```powershell
 python chat_cli.py
 ```
 
 The CLI accepts direct questions by default. `SigerRouter` decides whether to use general chat or a Lampung domain tool.
+The installable `siger` command defaults to `dynamic` mode, which can choose
+general chat, Lampung tools, or the expertise orchestrator.
 
 ```txt
 You: Nyak haga mengan manuk di warung paghek jalan
@@ -202,6 +218,25 @@ Optional commands are still available for manual testing:
 ```
 
 Legacy numeric modes are also supported: `0` auto, `1` LO->ID, `2` ID->LO, `3` LO->EN, `4` reasoning, `5` chat, `6` word order, `7` expertise.
+
+Short route commands in `siger`:
+
+```txt
+/code TASK      developer/coding expertise
+/basic TASK     programming basic
+/debug TASK     algorithm/debug expertise
+/expert TASK    software engineering expert
+/reasoning TASK reasoning
+/lampung TASK   Lampung expertise
+/general TASK   general knowledge
+```
+
+They also work as one-shot subcommands:
+
+```powershell
+siger code "buat FastAPI todo lengkap dengan PostgreSQL"
+siger expert "rancang arsitektur API production"
+```
 
 Expertise mode:
 

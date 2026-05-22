@@ -185,10 +185,14 @@ class ExpertiseOrchestrator:
         text: str,
         max_new_tokens: int = 160,
         max_domains: int = 4,
+        forced_domains: list[str] | None = None,
     ) -> ExpertiseResponse:
         effective_text = self._prepare_user_text(text)
         task_summary = self.summarize_task(effective_text)
-        specs = self.detect_expertise(effective_text, max_domains=max_domains)
+        if forced_domains:
+            specs = self._forced_specs(forced_domains, max_domains=max_domains)
+        else:
+            specs = self.detect_expertise(effective_text, max_domains=max_domains)
         retrieved_context = self._retrieved_context(effective_text)
         drafts = [
             self._run_expertise(spec, effective_text, task_summary, max_new_tokens, retrieved_context)
@@ -242,6 +246,26 @@ class ExpertiseOrchestrator:
             if len(selected) >= max_domains:
                 break
         return selected
+
+    def _forced_specs(
+        self,
+        names: list[str] | None,
+        *,
+        max_domains: int = 4,
+    ) -> list[ExpertiseSpec]:
+        selected: list[ExpertiseSpec] = []
+        seen: set[str] = set()
+        for name in names or []:
+            if name in seen:
+                continue
+            try:
+                selected.append(self._spec(name))
+            except KeyError:
+                continue
+            seen.add(name)
+            if len(selected) >= max_domains:
+                break
+        return selected or [self._spec("general_knowledge")]
 
     def looks_lampung(self, text: str) -> bool:
         words = set(re.findall(r"[a-z']+", text.lower()))

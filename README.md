@@ -80,6 +80,7 @@ Repository saat ini sudah berisi model core, pipeline data, workflow training, L
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution workflow, dataset format, dan commit style |
 | [SECURITY.md](SECURITY.md) | Security policy dan private reporting |
 | [docs/INSTALLATION.md](docs/INSTALLATION.md) | Setup, install, dan smoke checks |
+| [docs/CLI.md](docs/CLI.md) | Installable `siger` command, interactive chat, ask, config |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Arsitektur SSM/Mamba-like dan module boundaries |
 | [docs/DATA_MINING.md](docs/DATA_MINING.md) | Mining dataset Q&A, instruction, dan Laravel menjadi instruction JSONL |
 | [docs/RUN_COMMANDS.md](docs/RUN_COMMANDS.md) | Cheatsheet command setup, training, mining, dan testing |
@@ -457,11 +458,23 @@ These numbers are experiment notes, not final benchmark claims.
 
 ## Inference CLI
 
+Installable command:
+
+```powershell
+pip install -e .
+siger
+siger ask "Jelaskan REST API secara ringkas."
+```
+
+Legacy script:
+
 ```powershell
 python chat_cli.py
 ```
 
 CLI default sekarang menerima pertanyaan langsung. Router otomatis memilih general chat atau tool Lampung.
+Untuk command installable `siger`, default mode adalah `dynamic`: CLI memilih
+general chat, Lampung, atau expertise sesuai isi prompt.
 
 ```txt
 You: Nyak haga mengan manuk di warung paghek jalan
@@ -480,9 +493,30 @@ Command opsional tetap tersedia untuk debug:
 /reason    reasoning Lampung O -> Indonesia
 /chat      paksa general chat
 /reorder   susun kata Lampung O
+/expertise general expertise orchestrator
+/doc PATH   muat dokumen panjang ke long-context memory
 ```
 
-Mode angka lama masih didukung: `0` auto, `1` LO->ID, `2` ID->LO, `3` LO->EN, `4` reasoning, `5` chat, `6` susun kata.
+Mode angka lama masih didukung: `0` auto, `1` LO->ID, `2` ID->LO, `3` LO->EN, `4` reasoning, `5` chat, `6` susun kata, `7` expertise.
+
+Route command pendek di `siger`:
+
+```txt
+/code TASK      developer/coding expertise
+/basic TASK     programming dasar
+/debug TASK     algoritma/debug menengah
+/expert TASK    software engineering expert
+/reasoning TASK reasoning
+/lampung TASK   Lampung expertise
+/general TASK   general knowledge
+```
+
+Route itu juga bisa dipakai sebagai subcommand:
+
+```powershell
+siger code "buat FastAPI todo lengkap dengan PostgreSQL"
+siger expert "rancang arsitektur API production"
+```
 
 Lampung O -> English examples:
 

@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "siger-llm"
 version = "0.1.0"
@@ -40,6 +44,9 @@ dependencies = [
     "rouge-score>=0.1.2",
 ]
 
+[project.scripts]
+siger = "siger_cli.main:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.2.0",
@@ -53,3 +60,22 @@ line-length = 88
 
 [tool.isort]
 profile = "black"
+
+[tool.setuptools]
+py-modules = ["chat_cli", "main", "train_pipeline"]
+
+[tool.setuptools.packages.find]
+include = [
+    "config*",
+    "evaluation*",
+    "inference*",
+    "lora*",
+    "memory*",
+    "modalities*",
+    "model*",
+    "optimization*",
+    "retrieval*",
+    "siger_cli*",
+    "tokenizer*",
+    "training*",
+]
