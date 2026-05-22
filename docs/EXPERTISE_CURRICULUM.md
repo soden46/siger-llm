@@ -99,6 +99,77 @@ print(response.domains)
 print(response.text)
 ```
 
+## Extending New Domains
+
+SigerLM is designed to grow by adding new expertise domains instead of trying to
+learn every topic in the first training run.
+
+For a new domain, add:
+
+```txt
+configs/datasets/expertise_<domain>.json
+configs/training/expertise_<domain>_lora.json
+```
+
+Recommended flow:
+
+```txt
+current neural mixer checkpoint
+  -> new domain LoRA
+  -> new merged domain checkpoint
+  -> neural mixer v2 with old domains + new domain
+```
+
+Example domains:
+
+```txt
+expertise_medical
+expertise_legal
+expertise_agriculture
+expertise_cybersecurity
+expertise_finance
+expertise_regional_language_<name>
+```
+
+Keep the core model general. Domain specificity should enter through dataset
+registries, LoRA adapters, retrieval tools, and the `ExpertiseOrchestrator`.
+
+## Feedback Repair Loop
+
+User feedback can become training data, but it should not be trained online
+immediately. Store it, audit it, and periodically fine-tune a repair adapter.
+
+Preferred feedback row:
+
+```json
+{
+  "instruction": "original user request",
+  "input": "optional previous model answer or context",
+  "output": "curated corrected answer",
+  "system": "Kamu adalah SigerLM, asisten yang memperbaiki jawaban berdasarkan feedback user.",
+  "source": "user_feedback",
+  "type": "feedback_repair"
+}
+```
+
+Safe feedback pipeline:
+
+```txt
+user prompt + model answer + user correction
+  -> raw feedback store
+  -> dedupe
+  -> toxicity/noise filtering
+  -> domain tagging
+  -> human or rule audit
+  -> feedback repair JSONL
+  -> periodic LoRA repair run
+  -> regression tests
+  -> mixer refresh
+```
+
+Do not train directly on every feedback item. Unfiltered feedback can teach the
+model wrong facts, bad style, private data, or prompt-injection behavior.
+
 ## Single-Domain Runs
 
 Build one domain corpus:

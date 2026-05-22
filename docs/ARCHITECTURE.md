@@ -329,6 +329,11 @@ Dense -> MoE warm-start requires matching base tensor shapes. The automatic pipe
 
 The MoE branch is still domain-neutral. It must not contain hard-coded Lampung, Laravel, or routing logic. Any specialization should emerge from data and adapter training, while explicit domain behavior remains in `retrieval/` and `inference/`.
 
+New expertise domains should follow the same rule: add separated dataset
+registries, LoRA stages, retrieval/tools when needed, and runtime orchestration
+outside the core model. The domain-extension and feedback-repair workflow is
+documented in `docs/EXPERTISE_CURRICULUM.md`.
+
 End-to-end forward pass:
 
 ```txt
