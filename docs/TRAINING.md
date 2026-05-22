@@ -147,6 +147,23 @@ PYTORCH_ALLOC_CONF=expandable_segments:True python train_pipeline.py --mode lora
 
 LoRA stages are hardware-aware. If CUDA is available, SigerLM uses CUDA mixed precision and conservative VRAM-aware batch scaling. If the runtime falls back to CPU, the run is automatically capped to a small smoke/debug profile (`cpu_max_steps`, `cpu_max_samples`, `cpu_max_seq_len`) so a Kaggle notebook does not spend days on accidental FP32 CPU training.
 
+For gentler Stage 2 repair on the current small checkpoint, use the balanced
+repair configs instead of the full mixed Stage 2 corpus:
+
+```powershell
+python tools\build_instruction_corpus.py --registry configs\datasets\cpu_repair_general_balanced.json --max-row-tokens 512
+python lora\run_lora.py --config configs\training\cpu_repair_general_balanced_lora.json
+```
+
+GPU variant:
+
+```powershell
+python tools\build_instruction_corpus.py --registry configs\datasets\gpu_stage2_balanced.json --max-row-tokens 768
+python lora\run_lora.py --config configs\training\gpu_stage2_balanced_lora.json
+```
+
+See `docs/BALANCED_REPAIR.md`.
+
 For a deliberate full CPU run:
 
 ```bash

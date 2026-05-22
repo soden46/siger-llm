@@ -84,6 +84,7 @@ Repository saat ini sudah berisi model core, pipeline data, workflow training, L
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Arsitektur SSM/Mamba-like dan module boundaries |
 | [docs/DATA_MINING.md](docs/DATA_MINING.md) | Mining dataset Q&A, instruction, dan Laravel menjadi instruction JSONL |
 | [docs/RUN_COMMANDS.md](docs/RUN_COMMANDS.md) | Cheatsheet command setup, training, mining, dan testing |
+| [docs/BALANCED_REPAIR.md](docs/BALANCED_REPAIR.md) | CPU/GPU balanced Stage 2 repair recipe untuk model kecil |
 | [DISTRIBUTED_TRAINING_ROADMAP.md](DISTRIBUTED_TRAINING_ROADMAP.md) | Future multi-GPU, cluster, and distributed training scaling roadmap |
 | [docs/TRAINING.md](docs/TRAINING.md) | Base training, corpus builder, dan LoRA training flow |
 | [docs/LORA.md](docs/LORA.md) | LoRA config, dataset formatting, dan merge workflow |

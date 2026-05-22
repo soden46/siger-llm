@@ -1,0 +1,91 @@
+{
+  "name": "cpu_repair_general_balanced",
+  "output_path": "data/corpus/cpu_repair_general_balanced_train.jsonl",
+  "shuffle_seed": 52,
+  "sources": [
+    {
+      "name": "stage1_foundation_clean",
+      "path": "data/corpus/curriculum_stage1_foundation_clean_train.jsonl",
+      "format": "instruction_jsonl",
+      "max_items": 3000,
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI umum yang cerdas, ringkas, dan akurat.",
+      "metadata": {"type": "balanced_foundation"}
+    },
+    {
+      "name": "corpus_indonesia_instruction",
+      "path": "data/mined/instruction/corpus_indonesia_sigerlm.jsonl",
+      "format": "instruction_jsonl",
+      "max_items": 1800,
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten Bahasa Indonesia yang memahami teks umum.",
+      "metadata": {
+        "type": "balanced_indonesian_corpus",
+        "exclude_sources": ["corpus_indonesia_translation"]
+      }
+    },
+    {
+      "name": "cendol_instruction",
+      "path": "data/mined/instruction/cendol_instruct_sigerlm.jsonl",
+      "format": "instruction_jsonl",
+      "max_items": 800,
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI umum yang menjawab instruksi dengan jelas.",
+      "metadata": {"type": "balanced_general_instruction"}
+    },
+    {
+      "name": "indonesian_general_instruction",
+      "path": "data/mined/instruction/indonesian_general_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "max_items": 800,
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten Bahasa Indonesia yang menjawab instruksi umum.",
+      "metadata": {"type": "balanced_indonesian_general"}
+    },
+    {
+      "name": "indonesian_qa_instruction",
+      "path": "data/mined/instruction/indonesian_qa_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "max_items": 400,
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten tanya jawab Bahasa Indonesia yang akurat.",
+      "metadata": {"type": "balanced_indonesian_qa"}
+    },
+    {
+      "name": "lampung_augmented_train",
+      "path": "data/lampung/final/train_augmented_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "max_items": 1200,
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten umum yang juga memahami Bahasa Lampung.",
+      "metadata": {"type": "balanced_lampung_bridge"}
+    },
+    {
+      "name": "lampung_kamus_full",
+      "path": "data/mined/instruction/kamus_lampung_o_full_sigerlm.jsonl",
+      "format": "instruction_jsonl",
+      "max_items": 300,
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten penerjemah Lampung Dialek O dan Bahasa Indonesia.",
+      "metadata": {"type": "balanced_lampung_dictionary"}
+    },
+    {
+      "name": "gsm8k_reasoning_light",
+      "path": "data/mined/instruction/gsm8k_sigerlm.jsonl",
+      "format": "instruction_jsonl",
+      "max_items": 600,
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten penalaran yang menjawab runtut dan ringkas.",
+      "metadata": {"type": "balanced_reasoning_light"}
+    },
+    {
+      "name": "laravel_instruction_light",
+      "path": "data/mined/instruction/laravel_instruction.jsonl",
+      "format": "instruction_jsonl",
+      "max_items": 400,
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten coding yang akurat, aman, dan ringkas.",
+      "metadata": {"type": "balanced_code_light"}
+    }
+  ]
+}
