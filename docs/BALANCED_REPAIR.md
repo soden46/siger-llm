@@ -17,6 +17,9 @@ python tools/build_instruction_corpus.py \
   --registry configs/datasets/curriculum_stage1_foundation_clean.json \
   --max-row-tokens 512
 
+python lora/run_lora.py \
+  --config configs/training/curriculum_stage1_foundation_lora.json
+
 python tools/build_instruction_corpus.py \
   --registry configs/datasets/cpu_repair_general_balanced.json \
   --max-row-tokens 512
