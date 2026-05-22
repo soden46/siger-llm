@@ -31,6 +31,25 @@ Output:
 checkpoints/lora/model_cpu_repair_general_balanced_merged.pt
 ```
 
+Continue for another bounded CPU repair pass:
+
+```bash
+python lora/run_lora.py \
+  --config configs/training/cpu_repair_general_balanced_continue_lora.json
+```
+
+The continue config uses the first pass output as its base checkpoint:
+
+```txt
+checkpoints/lora/model_cpu_repair_general_balanced_merged.pt
+```
+
+Continue output:
+
+```txt
+checkpoints/lora/model_cpu_repair_general_balanced_continue_merged.pt
+```
+
 Smoke test:
 
 ```bash
