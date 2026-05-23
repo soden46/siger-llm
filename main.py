@@ -147,11 +147,23 @@ def _apply_env_overrides(config: dict) -> None:
         "SIGER_SAVE_EVERY": "save_every",
         "SIGER_GRAD_ACCUM_STEPS": "grad_accum_steps",
         "SIGER_MAX_SEQ_LEN": "max_seq_len",
+        "SIGER_BATCH_SIZE": "batch_size",
+        "SIGER_WARMUP_STEPS": "warmup_steps",
+        "SIGER_MAX_DATASET_CHUNKS": "max_dataset_chunks",
+        "SIGER_MAX_TEXT_FILES": "max_text_files",
+        "SIGER_MAX_DATALOADER_WORKERS": "max_dataloader_workers",
+    }
+    float_overrides = {
+        "SIGER_MAX_LR": "max_lr",
+        "SIGER_MIN_LR": "min_lr",
+        "SIGER_WEIGHT_DECAY": "weight_decay",
+        "SIGER_RESOURCE_TARGET_FRACTION": "resource_target_fraction",
     }
     str_overrides = {
         "SIGER_CHECKPOINT_DIR": "checkpoint_dir",
         "SIGER_DEVICE": "device",
         "SIGER_PRECISION": "precision",
+        "SIGER_DISTRIBUTED_STRATEGY": "distributed_strategy",
     }
 
     for env_name, config_key in int_overrides.items():
@@ -161,12 +173,56 @@ def _apply_env_overrides(config: dict) -> None:
             config[config_key] = int(value)
             print(f"Env override {config_key}: {old} -> {config[config_key]}")
 
+    for env_name, config_key in float_overrides.items():
+        value = os.environ.get(env_name)
+        if value:
+            old = config.get(config_key)
+            config[config_key] = float(value)
+            print(f"Env override {config_key}: {old} -> {config[config_key]}")
+
     for env_name, config_key in str_overrides.items():
         value = os.environ.get(env_name)
         if value:
             old = config.get(config_key)
             config[config_key] = value
             print(f"Env override {config_key}: {old} -> {config[config_key]}")
+
+
+def _load_initial_checkpoint_if_requested(model: SigerLM, config: dict) -> None:
+    """Warm-start base training from a raw state_dict or full checkpoint."""
+    checkpoint_path = os.environ.get("SIGER_INIT_CHECKPOINT")
+    if not checkpoint_path:
+        return
+
+    path = Path(checkpoint_path)
+    if not path.exists():
+        raise FileNotFoundError(f"SIGER_INIT_CHECKPOINT not found: {path}")
+
+    checkpoint = torch.load(path, map_location="cpu")
+    state = checkpoint.get("model_state", checkpoint) if isinstance(checkpoint, dict) else checkpoint
+    if not isinstance(state, dict) or "embedding.weight" not in state:
+        raise RuntimeError(
+            f"SIGER_INIT_CHECKPOINT is not a SigerLM checkpoint/state_dict: {path}"
+        )
+
+    checkpoint_vocab = int(state["embedding.weight"].shape[0])
+    model_vocab = int(model.embedding.weight.shape[0])
+    if checkpoint_vocab != model_vocab:
+        raise RuntimeError(
+            "Checkpoint vocab_size tidak cocok dengan tokenizer/model saat ini: "
+            f"checkpoint={checkpoint_vocab}, model={model_vocab}. "
+            "Gunakan tokenizer yang sama atau retrain base model dari awal."
+        )
+
+    missing, unexpected = model.load_state_dict(state, strict=True)
+    if missing or unexpected:
+        raise RuntimeError(
+            "SIGER_INIT_CHECKPOINT tidak cocok dengan model profile saat ini. "
+            f"missing={missing[:10]}, unexpected={unexpected[:10]}"
+        )
+
+    config["init_checkpoint"] = str(path)
+    print(f"Warm-started model weights from SIGER_INIT_CHECKPOINT: {path}")
 
 def main():
     profile_name = os.environ.get("SIGER_MODEL_PROFILE", TRAIN_CONFIG.get("model_profile", "small")).lower()
@@ -262,6 +318,7 @@ def main():
     TRAIN_CONFIG["expand"] = model_config.expand
     
     model = SigerLM(model_config)
+    _load_initial_checkpoint_if_requested(model, TRAIN_CONFIG)
     compile_requested = (
         os.environ.get("SIGER_TORCH_COMPILE", "0") == "1"
         or bool(TRAIN_CONFIG.get("torch_compile", False))
