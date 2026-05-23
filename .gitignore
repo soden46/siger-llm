@@ -61,6 +61,11 @@ data/feedback/
 !data/feedback/approved_corrections.jsonl
 !data/feedback/README.md
 
+# Learning intake from web/app data is privacy-sensitive. Keep raw/sanitized
+# runtime intake local; export only deliberately curated public-safe corpora.
+data/intake/*
+!data/intake/README.md
+
 # Checkpoints and model artifacts
 checkpoints/base/
 checkpoints/lora/

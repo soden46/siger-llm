@@ -217,7 +217,6 @@ siger_llm/
 │   ├── extract_smt_paper.py
 │   ├── extract_percakapan_pdf.py
 │   ├── scrape_rajotuho.py
-│   ├── inspect_nusax_format.py
 │   ├── normalize_text.py
 │   ├── build_lampung_dataset.py
 │   ├── build_compositional_lampung_dataset.py
@@ -823,13 +822,22 @@ Manual commands remain available for debugging: `/lo-id`, `/id-lo`, `/lo-en`, `/
 
 ## 16. API Serving Architecture
 
-FastAPI endpoint target:
+FastAPI serving exposes a stable `/v1` surface for web and mobile apps while
+keeping the core model independent from application-specific logic.
+
+Main endpoint groups:
 
 ```txt
 GET    /health
-POST   /generate
-POST   /chat
-DELETE /chat/{session_id}
+GET    /v1/status
+POST   /v1/generate
+POST   /v1/chat
+POST   /v1/sessions
+GET    /v1/chat/{session_id}/memory
+POST   /v1/chat/{session_id}/memory/document
+POST   /v1/chat/{session_id}/memory/tool-result
+POST   /v1/feedback/*
+POST   /v1/learning/*
 ```
 
 Generate endpoint:
@@ -849,6 +857,32 @@ Generator.stream()
   -> StreamingResponse
   -> SSE client
 ```
+
+Runtime memory and Token Saver path:
+
+```txt
+document / tool result / long user context
+  -> optional tool-result compression
+  -> SessionMemory chunk store
+  -> retrieval into prompt budget
+  -> SigerLM generation
+```
+
+Learning intake path:
+
+```txt
+web/app/CRM/finance event
+  -> privacy scan and redaction
+  -> consent and domain policy
+  -> candidate or quarantine store
+  -> human review
+  -> approved training export
+```
+
+CRM conversations and household finance data are treated as high-risk sources.
+Customer-specific and family-specific facts should stay in local RAG or app
+memory. Training data should use anonymized support patterns, workflow events,
+or aggregate finance patterns only after review.
 
 ## 17. Evaluation Architecture
 

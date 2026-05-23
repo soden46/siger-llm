@@ -3,6 +3,7 @@ from typing import Optional
 from memory import ContextManager, SessionMemory
 
 from .generator import Generator
+from .tool_result_compressor import CompressionResult, ToolResultCompressor
 
 
 STOP_MARKERS = ("<|end_turn|>", "<|user|>", "<|assistant|>", "<|system|>", "<|eos|>", "<|bos|>")
@@ -43,6 +44,7 @@ class ChatSession:
         long_input_threshold_chars: int = 1200,
         document_chunk_size_words: int = 180,
         document_overlap_words: int = 40,
+        tool_result_compressor: ToolResultCompressor | None = None,
     ):
         self.generator = generator
         self.system_prompt = system_prompt or self.SYSTEM_PROMPT
@@ -52,6 +54,13 @@ class ChatSession:
         self.document_chunk_size_words = document_chunk_size_words
         self.document_overlap_words = document_overlap_words
         self.history: list[dict] = []
+        self.tool_result_compressor = tool_result_compressor or ToolResultCompressor()
+        self.tool_compression_stats = {
+            "tool_results": 0,
+            "compressed_tool_results": 0,
+            "original_chars": 0,
+            "stored_chars": 0,
+        }
 
         self.memory = SessionMemory(max_recent_turns=max_history)
         self.context_manager = ContextManager(
@@ -128,6 +137,29 @@ class ChatSession:
             overlap_words=self.document_overlap_words,
         )
 
+    def add_tool_result(
+        self,
+        output: str,
+        command: str = "",
+        metadata: Optional[dict] = None,
+    ) -> CompressionResult:
+        result = self.tool_result_compressor.compress(
+            output,
+            command=command,
+            source=(metadata or {}).get("source", "tool"),
+        )
+        tool_metadata = {
+            **result.metadata(),
+            **(metadata or {}),
+            "command": command,
+        }
+        self.add_document(result.text, metadata=tool_metadata)
+        self.tool_compression_stats["tool_results"] += 1
+        self.tool_compression_stats["compressed_tool_results"] += int(result.compressed)
+        self.tool_compression_stats["original_chars"] += result.original_chars
+        self.tool_compression_stats["stored_chars"] += result.compressed_chars
+        return result
+
     def add_pinned_fact(self, fact: str) -> None:
         self.memory.add_pinned_fact(fact)
 
@@ -141,11 +173,18 @@ class ChatSession:
             "summary_chars": len(self.memory.summary),
             "long_summary_chars": len(self.memory.long_context_summary),
             "max_context_tokens": self.max_context_tokens,
+            "tool_compression": dict(self.tool_compression_stats),
         }
 
     def reset(self) -> None:
         self.history.clear()
         self.memory.clear()
+        self.tool_compression_stats = {
+            "tool_results": 0,
+            "compressed_tool_results": 0,
+            "original_chars": 0,
+            "stored_chars": 0,
+        }
         print("Chat session reset.")
 
     def show_history(self) -> None:

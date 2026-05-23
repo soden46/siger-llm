@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "min_chars": 1200,
+  "max_lines": 120,
+  "max_tail_lines": 24,
+  "max_items": 80,
+  "max_items_per_file": 8,
+  "include_header": true,
+  "fallback_to_original_if_larger": true,
+  "notes": [
+    "Compress only tool results or long context blocks before they enter chat memory.",
+    "Do not use this as model training data unless a human has approved the compressed target.",
+    "The compressor is intentionally lossy and reports metadata so callers can inspect the trade-off."
+  ]
+}

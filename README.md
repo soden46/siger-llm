@@ -62,7 +62,9 @@ Kalau kamu tertarik dengan low-resource language AI, infrastruktur AI Indonesia,
 - Dataset pipeline Lampung O/Nyo -> Indonesia -> English
 - PDF extraction tools untuk kamus, paper SMT, dan dataset percakapan
 - Evaluation dan optimization scaffolding: PPL, BLEU/ROUGE, ONNX, quantization, CPU benchmark
-- FastAPI endpoint dan streaming response scaffolding
+- FastAPI serving untuk web/mobile: generate, chat session, SSE streaming, memory, tool-result context, dan feedback
+- Token Saver untuk memadatkan output tool/log sebelum masuk konteks model
+- Privacy-first learning intake untuk data web/app dengan redaction, consent gate, review, dan export corpus terkurasi
 
 ## Status
 
@@ -90,6 +92,10 @@ Repository saat ini sudah berisi model core, pipeline data, workflow training, L
 | [docs/LORA.md](docs/LORA.md) | LoRA config, dataset formatting, dan merge workflow |
 | [docs/MODALITY_AGNOSTIC_BACKBONE.md](docs/MODALITY_AGNOSTIC_BACKBONE.md) | Roadmap backbone modality-agnostic untuk text, vision, audio, video, sensor, graph, dan agent |
 | [docs/INFERENCE.md](docs/INFERENCE.md) | Generator, chat, Lampung pipeline, dan router CLI |
+| [docs/API_INTEGRATION.md](docs/API_INTEGRATION.md) | FastAPI serving untuk web/mobile, chat session, memory, dan feedback |
+| [docs/TOKEN_SAVER.md](docs/TOKEN_SAVER.md) | Context/tool-result compression agar prompt lebih hemat |
+| [docs/DATA_GOVERNANCE.md](docs/DATA_GOVERNANCE.md) | Privacy-first learning intake untuk data web/app |
+| [docs/CRM_FINANCE_LEARNING_INTAKE.md](docs/CRM_FINANCE_LEARNING_INTAKE.md) | Panduan intake data CRM, Chatwoot/Evolution API, dan finance app |
 | [docs/EVALUATION.md](docs/EVALUATION.md) | Current evaluation scope dan smoke results |
 | [docs/OPTIMIZATION.md](docs/OPTIMIZATION.md) | CPU/VPS, ONNX, quantization, dan benchmark notes |
 
@@ -114,6 +120,16 @@ raw data / domain data
   -> merged checkpoint
   -> inference router
   -> general chat or Lampung domain tools
+```
+
+Runtime context and app-learning path:
+
+```txt
+web/mobile/CRM app
+  -> FastAPI /v1 endpoints
+  -> session memory, RAG context, or learning intake
+  -> privacy filter and review gate for training candidates
+  -> approved corpus export
 ```
 
 Core model boundary:
@@ -552,10 +568,16 @@ Generated token
 Decoded response
 ```
 
+Serve API:
+
+```powershell
+python serve_api.py --checkpoint checkpoints\lora\model_final_merged.pt --host 0.0.0.0 --port 8000
+```
+
 Example API request:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/generate \
+curl -X POST http://127.0.0.1:8000/v1/generate \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "Apa itu kecerdasan buatan?",
@@ -563,6 +585,13 @@ curl -X POST http://127.0.0.1:8000/generate \
     "temperature": 0.8
   }'
 ```
+
+Related docs:
+
+- `docs/API_INTEGRATION.md`
+- `docs/TOKEN_SAVER.md`
+- `docs/DATA_GOVERNANCE.md`
+- `docs/CRM_FINANCE_LEARNING_INTAKE.md`
 
 ## CPU/VPS Optimization Target
 
