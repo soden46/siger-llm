@@ -59,6 +59,6 @@ class TrainingLogger:
         print(f"Training complete!")
         print(f"  Steps   : {total_steps:,}")
         print(f"  Avg Loss: {avg_loss:.4f}")
-        print(f"  PPL     : {2**avg_loss:.2f}")
+        print(f"  PPL     : {math.exp(avg_loss):.2f}")
         print(f"  Time    : {elapsed/3600:.2f}h")
         print(f"{'='*60}")

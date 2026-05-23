@@ -5,6 +5,18 @@ from memory import ContextManager, SessionMemory
 from .generator import Generator
 
 
+STOP_MARKERS = ("<|end_turn|>", "<|user|>", "<|assistant|>", "<|system|>", "<|eos|>", "<|bos|>")
+
+
+def clean_assistant_response(text: str) -> str:
+    """Trim generated turn markers before storing or printing chat output."""
+    cleaned = text
+    for marker in STOP_MARKERS:
+        if marker in cleaned:
+            cleaned = cleaned.split(marker, 1)[0]
+    return cleaned.strip()
+
+
 class ChatSession:
     """
     Stateful chat session backed by long-session memory.
@@ -84,6 +96,7 @@ class ChatSession:
                 ],
                 **gen_kwargs,
             )
+            response = clean_assistant_response(response)
 
         self.history.append({"role": "user", "content": effective_user_input})
         self.history.append({"role": "assistant", "content": response})
@@ -105,7 +118,7 @@ class ChatSession:
             full_response += token_str
 
         print()
-        return full_response.strip()
+        return clean_assistant_response(full_response)
 
     def add_document(self, text: str, metadata: Optional[dict] = None) -> None:
         self.memory.add_document(

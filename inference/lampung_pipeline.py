@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from inference.generator import Generator
+from inference.chat import clean_assistant_response
 from inference.prompt_builder import (
     build_reasoning_prompt,
     build_translation_prompt,
@@ -124,4 +125,4 @@ class LampungPipeline:
                 self.tokenizer.eos_id,
             ],
         )
-        return LampungResponse(output.strip(), source)
+        return LampungResponse(clean_assistant_response(output), source)
