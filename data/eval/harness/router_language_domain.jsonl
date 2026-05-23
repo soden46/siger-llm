@@ -1,0 +1,8 @@
+{"id":"id_general_qa","prompt":"Jelaskan apa itu energi terbarukan secara singkat.","expected_language":"id","expected_domain":"general","expected_intent":"general_chat"}
+{"id":"en_general_qa","prompt":"Explain renewable energy in two short sentences.","expected_language":"en","expected_domain":"general","expected_intent":"general_chat"}
+{"id":"lampung_o_translation","prompt":"Nyak haga mengan manuk.","expected_language":"lampung_o","expected_domain":"translation","expected_intent":"lampung_to_id"}
+{"id":"id_en_translation","prompt":"Translate this Indonesian sentence to English: Saya mau makan di rumah.","expected_language":"en","expected_domain":"translation","expected_intent":"general_chat"}
+{"id":"laravel_domain","prompt":"Buat migration Laravel untuk tabel leads.","expected_language":"id","expected_domain":"laravel","expected_intent":"general_chat"}
+{"id":"code_basic","prompt":"Tulis function Python untuk menjumlahkan dua angka.","expected_language":"id","expected_domain":"code","expected_intent":"general_chat"}
+{"id":"math_basic","prompt":"Hitung 12 dikali 8 dan jelaskan singkat.","expected_language":"id","expected_domain":"math","expected_intent":"general_chat"}
+{"id":"debug_domain","prompt":"Debug error traceback Python ini: KeyError pada dictionary.","expected_language":"id","expected_domain":"debug","expected_intent":"general_chat"}

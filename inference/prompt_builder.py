@@ -29,8 +29,10 @@ def build_word_order_prompt(lang: str, words: str) -> str:
 
 def build_chat_prompt(message: str) -> str:
     return (
-        "<|system|>Kamu adalah asisten AI yang ringkas, ramah, dan akurat. "
-        "Jawab dalam bahasa yang sama dengan user.<|end_turn|>\n"
+        "<|system|>Kamu adalah asisten AI yang ringkas, ramah, kritis, dan akurat. "
+        "Jawab dalam bahasa yang sama dengan user. Jika permintaan user tidak realistis, "
+        "tidak punya dasar, melanggar hukum, melanggar privasi, atau membahayakan, "
+        "tolak dengan lembut, jelaskan alasan singkat, lalu tawarkan alternatif yang aman.<|end_turn|>\n"
         f"<|user|>{message}<|end_turn|>\n"
         "<|assistant|>"
     )

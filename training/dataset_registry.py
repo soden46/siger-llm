@@ -18,11 +18,20 @@ class DatasetSource:
 
 
 @dataclass(frozen=True)
+class MixTarget:
+    name: str
+    fraction: float
+
+
+@dataclass(frozen=True)
 class DatasetRegistry:
     name: str
     output_path: str
     sources: list[DatasetSource]
     shuffle_seed: int = 42
+    target_total_rows: int | None = None
+    target_mix: list[MixTarget] = field(default_factory=list)
+    max_oversample_factor: int = 5
 
     @classmethod
     def from_json(cls, path: str | Path) -> "DatasetRegistry":
@@ -46,11 +55,36 @@ class DatasetRegistry:
         if not sources:
             raise ValueError(f"Dataset registry has no sources: {registry_path}")
 
+        mix_data = data.get("target_mix", {})
+        if isinstance(mix_data, dict):
+            target_total_rows = mix_data.get("total_rows")
+            raw_groups = mix_data.get("groups", [])
+        else:
+            target_total_rows = None
+            raw_groups = []
+
+        target_mix = [
+            MixTarget(
+                name=str(item["name"]),
+                fraction=float(item["fraction"]),
+            )
+            for item in raw_groups
+        ]
+        if target_mix:
+            fraction_sum = sum(item.fraction for item in target_mix)
+            if not 0.99 <= fraction_sum <= 1.01:
+                raise ValueError(
+                    f"target_mix fractions in {registry_path} must sum to 1.0, got {fraction_sum:.4f}"
+                )
+
         return cls(
             name=str(data.get("name", registry_path.stem)),
             output_path=str(data["output_path"]),
             sources=sources,
             shuffle_seed=int(data.get("shuffle_seed", 42)),
+            target_total_rows=int(target_total_rows) if target_total_rows is not None else None,
+            target_mix=target_mix,
+            max_oversample_factor=max(1, int(mix_data.get("max_oversample_factor", 5))) if isinstance(mix_data, dict) else 5,
         )
 
 

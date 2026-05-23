@@ -1,0 +1,115 @@
+{
+  "name": "siger_base_trilingual_mix",
+  "output_path": "data/corpus/siger_base_trilingual_mix_train.jsonl",
+  "shuffle_seed": 51,
+  "target_mix": {
+    "total_rows": 100000,
+    "max_oversample_factor": 5,
+    "groups": [
+      {"name": "indonesian", "fraction": 0.30},
+      {"name": "english", "fraction": 0.25},
+      {"name": "lampung_o", "fraction": 0.20},
+      {"name": "code", "fraction": 0.20},
+      {"name": "math_reasoning", "fraction": 0.03},
+      {"name": "safety", "fraction": 0.02}
+    ]
+  },
+  "sources": [
+    {
+      "name": "indonesian_text",
+      "path": "data/indonesian.txt",
+      "format": "text_completion",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI umum yang cerdas, ringkas, dan akurat.",
+      "metadata": {
+        "lang": "id",
+        "domain": "general",
+        "mix_group": "indonesian"
+      }
+    },
+    {
+      "name": "indonesian_kaggle_local",
+      "path": "data/corpus/kaggle_local_inputs_train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI umum yang cerdas, ringkas, dan akurat.",
+      "metadata": {
+        "lang": "id",
+        "domain": "general",
+        "mix_group": "indonesian"
+      }
+    },
+    {
+      "name": "english_text",
+      "path": "data/english.txt",
+      "format": "text_completion",
+      "weight": 1,
+      "system_prompt": "You are SigerLM, a concise and accurate general AI assistant.",
+      "metadata": {
+        "lang": "en",
+        "domain": "general",
+        "mix_group": "english"
+      }
+    },
+    {
+      "name": "lampung_instruction",
+      "path": "data/corpus/lampung_instruction_train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI umum dengan kemampuan khusus Bahasa Lampung O. Jawab akurat dan ringkas.",
+      "metadata": {
+        "lang": "lampung_o",
+        "domain": "translation",
+        "mix_group": "lampung_o"
+      }
+    },
+    {
+      "name": "code_text",
+      "path": "data/code.txt",
+      "format": "text_completion",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI yang membantu memahami dan melanjutkan kode.",
+      "metadata": {
+        "lang": "mixed",
+        "domain": "code",
+        "mix_group": "code"
+      }
+    },
+    {
+      "name": "software_engineering_instruction",
+      "path": "data/corpus/software_engineering_instruction_train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI untuk coding, debugging, dan technical documentation.",
+      "metadata": {
+        "lang": "mixed",
+        "domain": "code",
+        "mix_group": "code"
+      }
+    },
+    {
+      "name": "reasoning_instruction",
+      "path": "data/corpus/reasoning_instruction_train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI yang menjawab soal reasoning dan matematika secara ringkas.",
+      "metadata": {
+        "lang": "mixed",
+        "domain": "math",
+        "mix_group": "math_reasoning"
+      }
+    },
+    {
+      "name": "safety_uncertainty_seed",
+      "path": "data/capabilities/uncertainty_seed.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI yang jujur, kritis, aman, dan menolak permintaan berbahaya dengan lembut.",
+      "metadata": {
+        "lang": "id",
+        "domain": "safety",
+        "mix_group": "safety"
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "name": "siger_trilingual_domain_harness",
+  "output_dir": "logs/eval/harness",
+  "device": "auto",
+  "generation": {
+    "max_new_tokens": 80,
+    "temperature": 0.2,
+    "top_k": 20,
+    "top_p": 0.8
+  },
+  "suites": [
+    {
+      "name": "router_language_detection",
+      "kind": "router_static",
+      "path": "data/eval/harness/router_language_domain.jsonl",
+      "required": true
+    },
+    {
+      "name": "router_domain_detection",
+      "kind": "router_static",
+      "path": "data/eval/harness/router_language_domain.jsonl",
+      "required": true
+    },
+    {
+      "name": "safety_multilingual",
+      "kind": "safety_guardrail",
+      "path": "data/eval/harness/safety_multilingual.jsonl",
+      "required": true
+    },
+    {
+      "name": "lampung_lookup_regression",
+      "kind": "lampung_lookup",
+      "path": "data/eval/harness/lampung_lookup.jsonl",
+      "max_cases": 10,
+      "required": false
+    }
+  ]
+}

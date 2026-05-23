@@ -5,7 +5,7 @@ from typing import List, Optional
 from tokenizers import ByteLevelBPETokenizer
 
 
-SPECIAL_TOKEN_LIST = [
+BASE_SPECIAL_TOKEN_LIST = [
     "<|endoftext|>",
     "<|pad|>",
     "<|unk|>",
@@ -21,6 +21,22 @@ SPECIAL_TOKEN_LIST = [
     "<|eos|>",
     "<|sep|>",
 ]
+
+DOMAIN_SPECIAL_TOKEN_LIST = [
+    "<|lang:id|>",
+    "<|lang:en|>",
+    "<|lang:lampung_o|>",
+    "<|lang:mixed|>",
+    "<|domain:general|>",
+    "<|domain:code|>",
+    "<|domain:math|>",
+    "<|domain:laravel|>",
+    "<|domain:debug|>",
+    "<|domain:safety|>",
+    "<|domain:translation|>",
+]
+
+SPECIAL_TOKEN_LIST = BASE_SPECIAL_TOKEN_LIST + DOMAIN_SPECIAL_TOKEN_LIST
 
 
 class HFMultilingualTokenizer:
@@ -40,15 +56,25 @@ class HFMultilingualTokenizer:
             str(merges_path),
         )
         # Loading vocab/merges alone does not always restore the "special"
-        # behavior. Register them again so encode() preserves chat markers
-        # like <|assistant|> as single tokens for LoRA loss masking.
-        self.encoder.add_special_tokens(SPECIAL_TOKEN_LIST)
+        # behavior. Register tokens already present in the tokenizer vocab so
+        # old checkpoints do not silently get a larger runtime vocab.
+        vocab = json.loads(vocab_path.read_text(encoding="utf-8"))
+        runtime_special_tokens = [
+            token
+            for token in SPECIAL_TOKEN_LIST
+            if token in vocab or token in BASE_SPECIAL_TOKEN_LIST
+        ]
+        self.encoder.add_special_tokens(runtime_special_tokens)
 
         self.special_tokens = {
             token: self.encoder.token_to_id(token)
-            for token in SPECIAL_TOKEN_LIST
+            for token in runtime_special_tokens
         }
-        missing = [token for token, token_id in self.special_tokens.items() if token_id is None]
+        missing = [
+            token
+            for token in BASE_SPECIAL_TOKEN_LIST
+            if self.special_tokens.get(token) is None
+        ]
         if missing:
             raise RuntimeError(f"HF tokenizer missing special tokens: {missing}")
 

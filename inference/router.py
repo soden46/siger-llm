@@ -4,6 +4,7 @@ import re
 from dataclasses import dataclass
 
 from inference.chat import ChatSession
+from inference.constitutional_ai_layer import ConstitutionalAILayer
 from inference.lampung_pipeline import LampungPipeline, LampungResponse
 
 
@@ -38,11 +39,21 @@ class SigerRouter:
         "tabik",
     }
 
-    def __init__(self, chat: ChatSession, lampung: LampungPipeline):
+    def __init__(
+        self,
+        chat: ChatSession,
+        lampung: LampungPipeline,
+        safety_layer: ConstitutionalAILayer | None = None,
+    ):
         self.chat = chat
         self.lampung = lampung
+        self.safety_layer = safety_layer or ConstitutionalAILayer()
 
     def route(self, text: str, max_new_tokens: int = 80) -> RoutedResponse:
+        safety = self.safety_layer.guard_prompt(text)
+        if not safety.allowed:
+            return RoutedResponse(safety.response, f"refusal_{safety.category}", "constitutional guardrail")
+
         intent = self.detect_intent(text)
 
         if intent == "lampung_reason":
@@ -90,6 +101,54 @@ class SigerRouter:
             return "lampung_to_id"
 
         return "general_chat"
+
+    def detect_language(self, text: str) -> str:
+        normalized = self._norm(text)
+        if self.looks_lampung(normalized):
+            return "lampung_o"
+
+        english_markers = {
+            "the",
+            "and",
+            "please",
+            "translate",
+            "explain",
+            "what",
+            "how",
+            "why",
+        }
+        indonesian_markers = {
+            "dan",
+            "yang",
+            "tolong",
+            "terjemahkan",
+            "jelaskan",
+            "apa",
+            "bagaimana",
+            "kenapa",
+        }
+        words = set(re.findall(r"[a-z']+", normalized))
+        en_score = len(words & english_markers)
+        id_score = len(words & indonesian_markers)
+        if en_score > id_score:
+            return "en"
+        return "id"
+
+    def detect_domain(self, text: str) -> str:
+        normalized = self._norm(text)
+        if self.safety_layer.guard_prompt(text).allowed is False:
+            return "safety"
+        if re.search(r"\b(laravel|artisan|migration|eloquent|blade|controller)\b", normalized):
+            return "laravel"
+        if re.search(r"\b(debug|error|traceback|exception|bug|fix)\b", normalized):
+            return "debug"
+        if re.search(r"\b(python|javascript|php|sql|function|class|api|kode|code)\b", normalized):
+            return "code"
+        if re.search(r"\b(hitung|matematika|integral|turunan|aljabar|probability|equation)\b", normalized):
+            return "math"
+        if re.search(r"\b(translate|terjemah(?:kan)?)\b", normalized) or self.looks_lampung(normalized):
+            return "translation"
+        return "general"
 
     def looks_lampung(self, text: str) -> bool:
         words = set(re.findall(r"[a-z']+", text.lower()))

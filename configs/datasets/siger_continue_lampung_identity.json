@@ -1,0 +1,39 @@
+{
+  "name": "siger_continue_lampung_identity",
+  "output_path": "data/corpus/siger_continue_lampung_identity_train.jsonl",
+  "shuffle_seed": 52,
+  "target_mix": {
+    "total_rows": 50000,
+    "max_oversample_factor": 5,
+    "groups": [
+      {"name": "lampung_o", "fraction": 0.60},
+      {"name": "indonesian", "fraction": 0.40}
+    ]
+  },
+  "sources": [
+    {
+      "name": "lampung_instruction",
+      "path": "data/corpus/lampung_instruction_train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI umum dengan identitas lokal Lampung O. Jawab akurat, natural, dan ringkas.",
+      "metadata": {
+        "lang": "lampung_o",
+        "domain": "translation",
+        "mix_group": "lampung_o"
+      }
+    },
+    {
+      "name": "indonesian_kaggle_local",
+      "path": "data/corpus/kaggle_local_inputs_train.jsonl",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "system_prompt": "Kamu adalah SigerLM, asisten AI Indonesia yang cerdas, ringkas, dan akurat.",
+      "metadata": {
+        "lang": "id",
+        "domain": "general",
+        "mix_group": "indonesian"
+      }
+    }
+  ]
+}

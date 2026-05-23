@@ -11,7 +11,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from training.dataset_registry import DatasetRegistry, DatasetSource, iter_jsonl, read_text_chunks
+from training.dataset_registry import DatasetRegistry, DatasetSource, MixTarget, iter_jsonl, read_text_chunks
 from tools.cot_formatter import maybe_apply_cot
 
 
@@ -37,6 +37,42 @@ CODE_CONTEXT_RE = re.compile(
 
 def normalize_text(value: Any) -> str:
     return " ".join(str(value or "").strip().split())
+
+
+def format_metadata_tags(lang: str, domain: str) -> str:
+    tags = []
+    if lang:
+        tags.append(f"<|lang:{lang}|>")
+    if domain:
+        tags.append(f"<|domain:{domain}|>")
+    return "".join(tags)
+
+
+def annotate_source_rows(rows: list[dict[str, Any]], source: DatasetSource) -> list[dict[str, Any]]:
+    metadata = source.metadata
+    lang = normalize_text(metadata.get("lang"))
+    domain = normalize_text(metadata.get("domain"))
+    mix_group = normalize_text(metadata.get("mix_group"))
+    prepend_tags = bool(metadata.get("prepend_tags", True))
+    tag_prefix = format_metadata_tags(lang, domain)
+
+    annotated = []
+    for row in rows:
+        fixed = dict(row)
+        if lang and not normalize_text(fixed.get("lang")):
+            fixed["lang"] = lang
+        if domain and not normalize_text(fixed.get("domain")):
+            fixed["domain"] = domain
+        if mix_group:
+            fixed["mix_group"] = mix_group
+
+        instruction = normalize_text(fixed.get("instruction"))
+        if prepend_tags and tag_prefix and instruction and not instruction.startswith("<|lang:"):
+            fixed["instruction"] = f"{tag_prefix}\n{instruction}"
+
+        annotated.append(fixed)
+
+    return annotated
 
 
 def is_code_like_row(row: dict[str, Any]) -> bool:
@@ -427,6 +463,8 @@ def convert_source(source: DatasetSource) -> list[dict[str, Any]]:
     if source.max_items is not None:
         rows = rows[: source.max_items]
 
+    rows = annotate_source_rows(rows, source)
+
     weighted: list[dict[str, Any]] = []
     for row in rows:
         for _ in range(source.weight):
@@ -437,6 +475,83 @@ def convert_source(source: DatasetSource) -> list[dict[str, Any]]:
         + (f" x{source.weight} => {len(weighted)}" if source.weight > 1 else "")
     )
     return weighted
+
+
+def apply_target_mix(
+    rows: list[dict[str, Any]],
+    targets: list[MixTarget],
+    *,
+    total_rows: int | None,
+    seed: int,
+    max_oversample_factor: int = 5,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    if not targets:
+        return rows, {}
+
+    total = total_rows or len(rows)
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        group = normalize_text(row.get("mix_group"))
+        if group:
+            grouped.setdefault(group, []).append(row)
+
+    rng = random.Random(seed)
+    mixed_rows: list[dict[str, Any]] = []
+    report_groups = []
+
+    target_counts = [int(round(total * target.fraction)) for target in targets]
+    if target_counts:
+        target_counts[-1] += total - sum(target_counts)
+
+    for target, target_count in zip(targets, target_counts):
+        available = grouped.get(target.name, [])
+        if not available:
+            report_groups.append(
+                {
+                    "name": target.name,
+                    "target_fraction": target.fraction,
+                    "target_rows": 0,
+                    "available_rows": 0,
+                    "emitted_rows": 0,
+                    "warning": "no rows available for this mix group",
+                }
+            )
+            continue
+
+        target_count = max(0, target_count)
+
+        shuffled = list(available)
+        rng.shuffle(shuffled)
+        if len(shuffled) >= target_count:
+            selected = shuffled[:target_count]
+            repeated = 0
+        else:
+            capped_count = min(target_count, len(shuffled) * max_oversample_factor)
+            selected = []
+            repeated = max(0, capped_count - len(shuffled))
+            while len(selected) < capped_count:
+                selected.extend(shuffled)
+            selected = selected[:capped_count]
+
+        mixed_rows.extend(dict(row) for row in selected)
+        report_groups.append(
+            {
+                "name": target.name,
+                "target_fraction": target.fraction,
+                "target_rows": target_count,
+                "available_rows": len(available),
+                "emitted_rows": len(selected),
+                "oversampled_rows": repeated,
+                "capped_by_max_oversample_factor": len(selected) < target_count,
+            }
+        )
+
+    rng.shuffle(mixed_rows)
+    return mixed_rows, {
+        "target_total_rows": total,
+        "target_mix_groups": report_groups,
+        "rows_after_target_mix": len(mixed_rows),
+    }
 
 
 def filter_quality(
@@ -538,6 +653,15 @@ def build_corpus_with_report(
     rows, duplicates_removed = dedupe_with_report(rows)
     report["duplicates_removed"] = duplicates_removed
     report["rows_after_dedupe"] = len(rows)
+
+    rows, mix_report = apply_target_mix(
+        rows,
+        registry.target_mix,
+        total_rows=registry.target_total_rows,
+        seed=registry.shuffle_seed,
+        max_oversample_factor=registry.max_oversample_factor,
+    )
+    report.update(mix_report)
 
     random.Random(registry.shuffle_seed).shuffle(rows)
     return rows, report

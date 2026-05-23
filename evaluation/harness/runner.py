@@ -13,6 +13,7 @@ from inference.chat import ChatSession
 from inference.generator import Generator
 from inference.lampung_pipeline import LampungPipeline
 from inference.router import SigerRouter
+from inference.constitutional_ai_layer import ConstitutionalAILayer
 
 from .checks import (
     contains_all,
@@ -168,6 +169,10 @@ class HarnessRunner:
                 result = self._run_router_suite(suite)
             elif kind == "lampung_lookup":
                 result = self._run_lampung_lookup_suite(suite)
+            elif kind == "router_static":
+                result = self._run_router_static_suite(suite)
+            elif kind == "safety_guardrail":
+                result = self._run_safety_guardrail_suite(suite)
             else:
                 result = {
                     "status": "failed" if required else "skipped",
@@ -219,6 +224,68 @@ class HarnessRunner:
                     "checks": checks,
                 }
             )
+        return self._case_summary(results)
+
+    def _run_router_static_suite(self, suite: dict[str, Any]) -> dict[str, Any]:
+        cases = self._load_cases(suite)
+        router = SigerRouter(chat=_DummyChat(), lampung=_DummyLampung())
+        results = []
+
+        for idx, case in enumerate(cases, start=1):
+            prompt = str(case.get("prompt") or case.get("instruction") or "").strip()
+            language = router.detect_language(prompt)
+            domain = router.detect_domain(prompt)
+            intent = router.detect_intent(prompt)
+            checks = {
+                "expected_language": language == normalize_text(case.get("expected_language")),
+                "expected_domain": domain == normalize_text(case.get("expected_domain")),
+            }
+            expected_intent = normalize_text(case.get("expected_intent"))
+            if expected_intent:
+                checks["expected_intent"] = intent == expected_intent
+            checks["passed"] = all(checks.values())
+            results.append(
+                {
+                    "id": case.get("id", idx),
+                    "prompt": prompt,
+                    "language": language,
+                    "domain": domain,
+                    "intent": intent,
+                    "passed": checks["passed"],
+                    "checks": checks,
+                }
+            )
+
+        return self._case_summary(results)
+
+    def _run_safety_guardrail_suite(self, suite: dict[str, Any]) -> dict[str, Any]:
+        cases = self._load_cases(suite)
+        layer = ConstitutionalAILayer()
+        results = []
+
+        for idx, case in enumerate(cases, start=1):
+            prompt = str(case.get("prompt") or case.get("instruction") or "").strip()
+            decision = layer.guard_prompt(prompt)
+            expected_allowed = bool(case.get("expected_allowed", True))
+            expected_category = normalize_text(case.get("expected_category"))
+            checks = {
+                "expected_allowed": decision.allowed == expected_allowed,
+            }
+            if expected_category:
+                checks["expected_category"] = decision.category == expected_category
+            checks["passed"] = all(checks.values())
+            results.append(
+                {
+                    "id": case.get("id", idx),
+                    "prompt": prompt,
+                    "allowed": decision.allowed,
+                    "category": decision.category,
+                    "response": decision.response,
+                    "passed": checks["passed"],
+                    "checks": checks,
+                }
+            )
+
         return self._case_summary(results)
 
     def _run_router_suite(self, suite: dict[str, Any]) -> dict[str, Any]:
@@ -418,6 +485,15 @@ def _string_list(value: Any) -> list[str]:
     if isinstance(value, list):
         return [str(item) for item in value]
     return [str(value)]
+
+
+class _DummyChat:
+    def chat(self, *args, **kwargs) -> str:
+        return ""
+
+
+class _DummyLampung:
+    pass
 
 
 def run_harness(

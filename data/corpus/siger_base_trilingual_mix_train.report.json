@@ -1,0 +1,122 @@
+{
+  "registry": "siger_base_trilingual_mix",
+  "output_path": "data/corpus/siger_base_trilingual_mix_train.jsonl",
+  "max_row_tokens": 2048,
+  "strict_laravel_php": true,
+  "sources": [
+    {
+      "name": "indonesian_text",
+      "format": "text_completion",
+      "weight": 1,
+      "rows_after_weight": 1
+    },
+    {
+      "name": "indonesian_kaggle_local",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 51969
+    },
+    {
+      "name": "english_text",
+      "format": "text_completion",
+      "weight": 1,
+      "rows_after_weight": 1
+    },
+    {
+      "name": "lampung_instruction",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 30701
+    },
+    {
+      "name": "code_text",
+      "format": "text_completion",
+      "weight": 1,
+      "rows_after_weight": 1
+    },
+    {
+      "name": "software_engineering_instruction",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 28
+    },
+    {
+      "name": "reasoning_instruction",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 15
+    },
+    {
+      "name": "safety_uncertainty_seed",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 14
+    }
+  ],
+  "rows_before_quality": 82730,
+  "filtered_too_long": 0,
+  "filtered_laravel_php_malformed": 0,
+  "laravel_fences_repaired": 0,
+  "html_fields_sanitized": 48,
+  "rows_after_quality": 82730,
+  "duplicates_removed": 13,
+  "rows_after_dedupe": 82717,
+  "target_total_rows": 100000,
+  "target_mix_groups": [
+    {
+      "name": "indonesian",
+      "target_fraction": 0.3,
+      "target_rows": 30000,
+      "available_rows": 51970,
+      "emitted_rows": 30000,
+      "oversampled_rows": 0,
+      "capped_by_max_oversample_factor": false
+    },
+    {
+      "name": "english",
+      "target_fraction": 0.25,
+      "target_rows": 25000,
+      "available_rows": 1,
+      "emitted_rows": 5,
+      "oversampled_rows": 4,
+      "capped_by_max_oversample_factor": true
+    },
+    {
+      "name": "lampung_o",
+      "target_fraction": 0.2,
+      "target_rows": 20000,
+      "available_rows": 30688,
+      "emitted_rows": 20000,
+      "oversampled_rows": 0,
+      "capped_by_max_oversample_factor": false
+    },
+    {
+      "name": "code",
+      "target_fraction": 0.2,
+      "target_rows": 20000,
+      "available_rows": 29,
+      "emitted_rows": 145,
+      "oversampled_rows": 116,
+      "capped_by_max_oversample_factor": true
+    },
+    {
+      "name": "math_reasoning",
+      "target_fraction": 0.03,
+      "target_rows": 3000,
+      "available_rows": 15,
+      "emitted_rows": 75,
+      "oversampled_rows": 60,
+      "capped_by_max_oversample_factor": true
+    },
+    {
+      "name": "safety",
+      "target_fraction": 0.02,
+      "target_rows": 2000,
+      "available_rows": 14,
+      "emitted_rows": 70,
+      "oversampled_rows": 56,
+      "capped_by_max_oversample_factor": true
+    }
+  ],
+  "rows_after_target_mix": 50295
+}

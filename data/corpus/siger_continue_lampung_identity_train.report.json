@@ -1,0 +1,50 @@
+{
+  "registry": "siger_continue_lampung_identity",
+  "output_path": "data/corpus/siger_continue_lampung_identity_train.jsonl",
+  "max_row_tokens": 2048,
+  "strict_laravel_php": true,
+  "sources": [
+    {
+      "name": "lampung_instruction",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 30701
+    },
+    {
+      "name": "indonesian_kaggle_local",
+      "format": "instruction_jsonl",
+      "weight": 1,
+      "rows_after_weight": 51969
+    }
+  ],
+  "rows_before_quality": 82670,
+  "filtered_too_long": 0,
+  "filtered_laravel_php_malformed": 0,
+  "laravel_fences_repaired": 0,
+  "html_fields_sanitized": 48,
+  "rows_after_quality": 82670,
+  "duplicates_removed": 13,
+  "rows_after_dedupe": 82657,
+  "target_total_rows": 50000,
+  "target_mix_groups": [
+    {
+      "name": "lampung_o",
+      "target_fraction": 0.6,
+      "target_rows": 30000,
+      "available_rows": 30688,
+      "emitted_rows": 30000,
+      "oversampled_rows": 0,
+      "capped_by_max_oversample_factor": false
+    },
+    {
+      "name": "indonesian",
+      "target_fraction": 0.4,
+      "target_rows": 20000,
+      "available_rows": 51969,
+      "emitted_rows": 20000,
+      "oversampled_rows": 0,
+      "capped_by_max_oversample_factor": false
+    }
+  ],
+  "rows_after_target_mix": 50000
+}

@@ -18,6 +18,20 @@ SPECIAL_TOKENS = {
     "<|en|>":            100266,   # English
     "<|code|>":          100267,   # Code block
 
+    # Explicit corpus tags for trilingual/domain-aware SigerLM.
+    # Keep these stable once a tokenizer/checkpoint is trained with them.
+    "<|lang:id|>":        100271,
+    "<|lang:en|>":        100272,
+    "<|lang:lampung_o|>": 100273,
+    "<|lang:mixed|>":     100274,
+    "<|domain:general|>": 100275,
+    "<|domain:code|>":    100276,
+    "<|domain:math|>":    100277,
+    "<|domain:laravel|>": 100278,
+    "<|domain:debug|>":   100279,
+    "<|domain:safety|>":  100280,
+    "<|domain:translation|>": 100281,
+
     # Structural
     "<|bos|>":           100268,   # Beginning of sequence
     "<|eos|>":           100269,   # End of sequence

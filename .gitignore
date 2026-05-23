@@ -96,3 +96,5 @@ Thumbs.db
 data/corpus/curriculum_stage4_full_train.jsonl
 data/corpus/curriculum_stage3_advanced_train.jsonl
 data/corpus/curriculum_stage2_general_train.jsonl
+data/corpus/siger_base_trilingual_mix_train.jsonl
+data/corpus/siger_continue_lampung_identity_train.jsonl
